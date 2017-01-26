@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmlmonitor-configuration>
+    <!--путь папки для загруженных файлов-->
+    <received_path>_received</received_path>
+    <!--путь папки для автоматической отправки файлов на удаленный сервер-->
+    <outcoming_path>_outcome</outcoming_path>
+    <!--путь папки для отправленных файлов-->
+    <sent_path>_sent</sent_path>
+    <!--путь и имя LOG файла-->
+    <log_file_path_name>result.log</log_file_path_name>
+    <!--макс. количество параллельных потоков-->
+    <thread_pool_size>50</thread_pool_size>
+    <!--маски автоматически отправляемых файлов-->
+    <outcoming_file_type_glob>*.{zip,txt,xml}</outcoming_file_type_glob>
+</xmlmonitor-configuration>
