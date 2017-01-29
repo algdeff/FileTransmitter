@@ -5,6 +5,7 @@ import org.apache.commons.configuration2.XMLConfiguration;
 import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
@@ -21,6 +22,9 @@ public final class ConfigManager {
 
     private static final String CONFIG_FILE_PATH =              "filetransmitter.conf.xml";
 
+
+    private static final String REMOTE_SERVER_URL =             "remote_server_url";
+    private static final String REMOTE_SERVER_PORT =            "remote_server_port";
 
     private static final String RECEIVED_PATH =                 "received_path";
     private static final String OUTCOMING_PATH =                "outcoming_path";
@@ -54,6 +58,14 @@ public final class ConfigManager {
     }
 
     public static void init() {
+    }
+
+    public static String getRemoteServerURL() {
+        return _properties.get(REMOTE_SERVER_URL);
+    }
+
+    public static int getRemoteServerPort() {
+        return Integer.parseInt(_properties.get(REMOTE_SERVER_PORT));
     }
 
     public static Path getReceivedPath() {

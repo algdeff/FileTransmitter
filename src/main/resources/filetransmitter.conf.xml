@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xmlmonitor-configuration>
+    <!--URL удаленного сервера-->
+    <remote_server_url>192.168.1.4</remote_server_url>
+    <!--PORT удаленного сервера-->
+    <remote_server_port>5252</remote_server_port>
     <!--путь папки для загруженных файлов-->
     <received_path>_received</received_path>
     <!--путь папки для автоматической отправки файлов на удаленный сервер-->

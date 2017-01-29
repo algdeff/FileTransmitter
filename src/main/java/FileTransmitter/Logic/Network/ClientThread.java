@@ -1,34 +1,39 @@
-package FileTransmitter;
+package FileTransmitter.Logic.Network;
+
+import FileTransmitter.Logic.ConfigManager;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ClientThread implements Runnable {
 
-    private static final String DEFAULT_FOLDER = "received";
-
-    public static final String CMD_RECEIVE_FILE_FROM_CLIENT = "1";
-    public static final String CMD_SEND_FILE_TO_CLIENT = "2";
-    public static final String CMD_SEND_SERVER_FILELIST_TO_CLIENT = "3";
-    public static final String CMD_RECEIVE_CLIENT_CHOISE = "4";
-    public static final String CMD_CLOSE_CONNECTION = "0";
+    private static final String CMD_RECEIVE_FILE_FROM_CLIENT = "1";
+    private static final String CMD_SEND_FILE_TO_CLIENT = "2";
+    private static final String CMD_SEND_SERVER_FILELIST_TO_CLIENT = "3";
+    private static final String CMD_RECEIVE_CLIENT_CHOISE = "4";
+    private static final String CMD_CLOSE_CONNECTION = "0";
 
     private Boolean isClosed = false;
-    private Socket clientSocket1;
-    private Socket clientSocket2;
+    private Socket _clientSocket1;
+    private Socket _clientSocket2;
+    private Path _receivedPath;
+
 
     public ClientThread(Socket sock1, Socket sock2) {
-        this.clientSocket1 = sock1;
-        this.clientSocket2 = sock2;
+        _clientSocket1 = sock1;
+        _clientSocket2 = sock2;
+        _receivedPath = ConfigManager.getReceivedPath();
     }
 
     @Override
     public void run() {
         try {
-            InputStream is = clientSocket2.getInputStream();
+            InputStream is = _clientSocket2.getInputStream();
             ObjectInputStream ois = new ObjectInputStream(is);
             String commandFromClient;
             while (!isClosed) {
@@ -59,36 +64,30 @@ public class ClientThread implements Runnable {
                         System.out.println("Incorrect command received.");
                         break;
                 }
-                //break;
+
             }
             ois.close();
-            clientSocket1.close();
-            clientSocket2.close();
+            _clientSocket1.close();
+            _clientSocket2.close();
 
         } catch (IOException ex) {
             Logger.getLogger(ClientThread.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
-    public void receiveClientChoice() {
+    private void receiveClientChoice() {
         String clientChoice = getClientChoice();
         System.out.println("clientChoice: " + clientChoice);
         sendFile(clientChoice);
     }
 
-    public void receiveFile() {
+    private void receiveFile() {
         try {
             int bytesRead;
-            DataInputStream clientData = new DataInputStream(clientSocket1.getInputStream());
-            String fileName = clientData.readUTF();
+            DataInputStream clientData = new DataInputStream(_clientSocket1.getInputStream());
+            Path fileName = Paths.get(_receivedPath.toString(), clientData.readUTF());
+            OutputStream output = new FileOutputStream(fileName.toAbsolutePath().toString());
 
-            File fil = new File(DEFAULT_FOLDER);
-            Boolean mkDirResult = fil.mkdir();
-            if (mkDirResult) {
-                System.out.println("Folder '" + fil.getAbsolutePath() + "' is now created.");
-            }
-
-            OutputStream output = new FileOutputStream((DEFAULT_FOLDER + "\\" + fileName));
             long size = clientData.readLong();
             byte[] buffer = new byte[1024];
             while (size > 0 && (bytesRead = clientData.read(buffer, 0, (int) Math.min(buffer.length, size))) != -1) {
@@ -96,13 +95,13 @@ public class ClientThread implements Runnable {
                 size -= bytesRead;
             }
             output.close();
-            System.out.println("File " + fileName + " received from client.");
+            System.out.println("File " + fileName.getFileName() + " received from client.");
         } catch (IOException ex) {
             System.err.println("Client error. Connection closed.");
         }
     }
 
-    public void sendFile(String fileName) {
+    private void sendFile(String fileName) {
         try {
             File myFile = new File(fileName);
             byte[] mybytearray = new byte[(int) myFile.length()];
@@ -111,7 +110,7 @@ public class ClientThread implements Runnable {
             DataInputStream dis = new DataInputStream(bis);
             dis.readFully(mybytearray, 0, mybytearray.length);
 
-            OutputStream os = clientSocket1.getOutputStream();
+            OutputStream os = _clientSocket1.getOutputStream();
             DataOutputStream dos = new DataOutputStream(os);
             dos.writeUTF(myFile.getName());
             dos.writeLong(mybytearray.length);
@@ -124,10 +123,10 @@ public class ClientThread implements Runnable {
         }
     }
 
-    public void sendServerFileList() {
+    private void sendServerFileList() {
         ArrayList<File> serverFilesList = getServerFileList(".");
         try {
-            OutputStream os = clientSocket1.getOutputStream();
+            OutputStream os = _clientSocket1.getOutputStream();
             ObjectOutputStream oos = new ObjectOutputStream(os);
 
             ArrayList<String> serverFilesInfo = new ArrayList<>();
@@ -146,7 +145,7 @@ public class ClientThread implements Runnable {
         }
     }
 
-    public ArrayList<File> getServerFileList(String str) {
+    private ArrayList<File> getServerFileList(String str) {
         ArrayList<File> listWithFileNames = new ArrayList<>();
         try {
             File fil = new File(str);
@@ -172,10 +171,10 @@ public class ClientThread implements Runnable {
         return listWithFileNames;
     }
 
-    public String getClientChoice() {
+    private String getClientChoice() {
         String clientChoice = "";
         try {
-            InputStream in = clientSocket1.getInputStream();
+            InputStream in = _clientSocket1.getInputStream();
             ObjectInputStream clientData = new ObjectInputStream(in);
             clientChoice = clientData.readUTF();
         } catch (Exception ex) {
