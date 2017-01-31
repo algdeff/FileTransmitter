@@ -5,7 +5,6 @@ import org.apache.commons.configuration2.XMLConfiguration;
 import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 
-import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
@@ -20,18 +19,16 @@ public final class ConfigManager {
      default: filetransmitter.conf.xml
      */
 
-    private static final String CONFIG_FILE_PATH =              "filetransmitter.conf.xml";
+    private static final String           CONFIG_FILE_PATH = "filetransmitter.conf.xml",
 
-
-    private static final String REMOTE_SERVER_URL =             "remote_server_url";
-    private static final String REMOTE_SERVER_PORT =            "remote_server_port";
-
-    private static final String RECEIVED_PATH =                 "received_path";
-    private static final String OUTCOMING_PATH =                "outcoming_path";
-    private static final String SENT_PATH =                     "sent_path";
-    private static final String LOG_FILE_PATH =                 "log_file_path_name";
-    private static final String THREAD_POOL_SIZE =              "thread_pool_size";
-    private static final String OUTCOMING_TYPES_GLOB =          "outcoming_file_type_glob";
+                                         REMOTE_SERVER_URL = "remote_server_url",
+                                        REMOTE_SERVER_PORT = "remote_server_port",
+                                             RECEIVED_PATH = "received_path",
+                                            OUTCOMING_PATH = "outcoming_path",
+                                                 SENT_PATH = "sent_path",
+                                             LOG_FILE_PATH = "log_file_path_name",
+                                          THREAD_POOL_SIZE = "thread_pool_size",
+                                      OUTCOMING_TYPES_GLOB = "outcoming_file_type_glob";
 
     private static final ConcurrentHashMap<String, String> _properties;
 

@@ -1,8 +1,7 @@
 package FileTransmitter;
 
 import FileTransmitter.Logic.ConfigManager;
-import FileTransmitter.Logic.FileSystemMonitor;
-import FileTransmitter.Logic.Network.NetworkServer;
+import FileTransmitter.Logic.ModeSelector;
 import FileTransmitter.Logic.ThreadPoolManager;
 import FileTransmitter.Logic.Workers.LogFileWorker;
 import FileTransmitter.Publisher.Publisher;
@@ -12,7 +11,7 @@ public class ServerStarter {
     private static String _serverName = "FileTransmitter";
     private static ServerStarter _instance;
 
-    private FileSystemMonitor _process;
+    private ModeSelector _process;
 
     private ServerStarter() {
     }
@@ -49,14 +48,14 @@ public class ServerStarter {
         ThreadPoolManager.getInstance()
                 .init(ConfigManager.getThreadPoolSize());
 
-        FileSystemMonitor fileSystemMonitor = new FileSystemMonitor();
-        fileSystemMonitor.start();
+        ModeSelector modeSelector = new ModeSelector();
+        modeSelector.start();
 
     }
 
     private void stop() {
 
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_DB_SHUTDOWN);
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_SERVER_TERMINATE);
         System.err.println("Server STOP");
     }
 

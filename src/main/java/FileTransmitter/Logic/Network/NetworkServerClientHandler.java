@@ -1,8 +1,9 @@
-package FileTransmitter.Logic.Workers;
+package FileTransmitter.Logic.Network;
 
 import FileTransmitter.Facade;
 import FileTransmitter.Logic.ConfigManager;
 import FileTransmitter.Publisher.PublisherEvent;
+import FileTransmitter.ServerStarter;
 
 import java.io.*;
 import java.net.SocketAddress;
@@ -19,6 +20,8 @@ public class NetworkServerClientHandler implements Runnable {
     private Path _sentPath;
 
     private AsynchronousSocketChannel _socketChanhel;
+    private ObjectInputStream _objectInputStream;
+    private ObjectOutputStream _objectOutputStream;
 
     public NetworkServerClientHandler(AsynchronousSocketChannel socketChanhel) {
         _socketChanhel = socketChanhel;
@@ -30,8 +33,6 @@ public class NetworkServerClientHandler implements Runnable {
     @Override
     public void run() {
         clientHandle();
-
-
     }
 
     private void clientHandle() {
@@ -42,18 +43,17 @@ public class NetworkServerClientHandler implements Runnable {
                 System.err.println("New client connected: " + clientAddress);
 
                 InputStream inputStream = Channels.newInputStream(_socketChanhel);
-                ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
+                _objectInputStream = new ObjectInputStream(inputStream);
 
                 OutputStream outputStream = Channels.newOutputStream(_socketChanhel);
-                ObjectOutputStream objectOutputStream = new ObjectOutputStream(outputStream);
+                _objectOutputStream = new ObjectOutputStream(outputStream);
 
                 while (true) {
-                    PublisherEvent eventFromClient = (PublisherEvent) objectInputStream.readObject();
+                    PublisherEvent eventFromClient = (PublisherEvent) _objectInputStream.readObject();
 
                     System.out.println(eventFromClient.getName() + "/"
                             + eventFromClient.getType() + "/"
                             + eventFromClient.getGroupName());
-
 
                     if (!eventFromClient.getType().equals(Facade.EVENT_TYPE_SERVERGROUP_CMD)) {
                         System.err.println("WRONG EVENT TYPE!");
@@ -68,10 +68,11 @@ public class NetworkServerClientHandler implements Runnable {
                         break;
                     }
 
-                    parseCommandFromClient(eventFromClient);
-
 //                    System.err.println("Received from client (" + clientAddress + "):\n" + object);
-                    objectOutputStream.writeObject("ECHO: Received from client: " + eventFromClient.getGroupName());
+
+                    ///////add check type STR?PublisherEvt to client///////_objectOutputStream.writeObject("ECHO: Received from client: " + eventFromClient.getGroupName());
+
+                    parseCommandFromClient(eventFromClient);
                 }
 
 //                objectOutputStream.close();
@@ -102,18 +103,18 @@ public class NetworkServerClientHandler implements Runnable {
 
         switch (command) {
             case Facade.CMD_SERVER_ADD_FILES: {
-
                 System.err.println("Command: " + command);
+                saveClientFileToReceivedFolder(eventFromClient);
                 break;
             }
             case Facade.CMD_SERVER_GET_FILES: {
                 System.err.println("Command: " + command);
+                sendServerFileToClient((String) eventFromClient.getBody());
                 break;
             }
             case Facade.CMD_SERVER_GET_FILES_LIST: {
                 System.err.println("Command: " + command);
-
-
+                sendServerFileListToClient();
                 break;
             }
 
@@ -121,15 +122,66 @@ public class NetworkServerClientHandler implements Runnable {
 
     }
 
-    private List<Path> getServerOutcommingPathContent() {
-        List<Path> fileList = new ArrayList<>();
+    private void saveClientFileToReceivedFolder(PublisherEvent eventFromClient) {
+        Path filename = Paths.get(_receivedPath.toString(), (String) eventFromClient.getArgs()[0]);
+        System.out.println(filename.toString() + " @@@ " + (long) eventFromClient.getArgs()[1]);
+
+        byte[] fileContent = (byte[]) eventFromClient.getBody();
+
+        System.out.println("+++" + fileContent.length);
+
+        try {
+            Files.write(filename, fileContent, StandardOpenOption.CREATE);
+        } catch (IOException e) {
+            e.printStackTrace();
+            ServerStarter.stopAndExit(1);
+        }
+
+    }
+
+    private void sendServerFileToClient(String filename) {
+        Path fileToSend = Paths.get(filename).normalize();
+
+        byte[] fileContent = new byte[0];
+        try {
+            fileContent = Files.readAllBytes(fileToSend);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        long fileSize = fileContent.length;
+
+        System.out.println(filename + " " + fileToSend.toString() + " " + fileSize);
+
+        PublisherEvent eventToClient = new PublisherEvent(Facade.CMD_SERVER_GET_FILES, fileContent).toServerCommand();
+        eventToClient.setArgs(fileToSend.toString(), fileSize);
+        sendEventToClient(eventToClient);
+
+    }
+
+    private void sendServerFileListToClient() {
+        PublisherEvent eventToServer = new PublisherEvent(Facade.CMD_SERVER_GET_FILES_LIST).toServerCommand();
+        eventToServer.setBody(getServerOutcommingPathContent());
+        sendEventToClient(eventToServer);
+    }
+
+    private void sendEventToClient(PublisherEvent publisherEvent) {
+        try {
+            _objectOutputStream.writeObject(publisherEvent);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private List<String> getServerOutcommingPathContent() {
+        List<String> fileList = new ArrayList<>();
 
         try {
             DirectoryStream<Path> directoryStream = Files.newDirectoryStream(_outcomingPath, ConfigManager
                     .getOutcomingTypesGlob());
             for (Path file : directoryStream) {
 //                if (!isCorrectFile(file)) continue;
-                fileList.add(file);
+                fileList.add(file.toString());
 //                ThreadPoolManager.getInstance().executeFutureTask(new FileProcessingThread(file));
             }
 

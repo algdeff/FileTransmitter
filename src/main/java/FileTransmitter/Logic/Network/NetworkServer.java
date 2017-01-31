@@ -1,19 +1,8 @@
 package FileTransmitter.Logic.Network;
 
-import FileTransmitter.Facade;
-import FileTransmitter.Logic.ConfigManager;
-import FileTransmitter.Logic.ThreadPoolManager;
-import FileTransmitter.Logic.Workers.FileProcessingThread;
-import FileTransmitter.Logic.Workers.NetworkServerClientHandler;
-import FileTransmitter.Publisher.PublisherEvent;
-import FileTransmitter.ServerStarter;
-
 import java.io.*;
 import java.net.*;
 import java.nio.channels.*;
-import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.*;
 
 public class NetworkServer {

@@ -44,8 +44,6 @@ public class LogFileWorker implements IListener {
         startQueueMonitor();
     }
 
-
-
     private void addLog(String message) {
         addRecord(getDateTimeNow() + " - " + message);
     }
@@ -58,12 +56,10 @@ public class LogFileWorker implements IListener {
 
     private void addRecord(List<String> records) {
         try {
-//            System.out.println("QUEUE1: put" + records.toString());
             _queue.put(records);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-//        System.out.println("QUEUE2: put" + records.toString());
     }
 
     private void startQueueMonitor() {

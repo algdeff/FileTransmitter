@@ -21,7 +21,7 @@ public final class Facade {
                             CMD_SERVER_GET_FILES_LIST = "cmd_server_get_files_list",
                                  CMD_SERVER_GET_FILES = "cmd_server_get_files",
                                  CMD_SERVER_ADD_FILES = "cmd_server_add_files",
-    CMD_SERVER_TERMINATE = "cmd_server_terminate";
+                                 CMD_SERVER_TERMINATE = "cmd_server_terminate";
 
 
 

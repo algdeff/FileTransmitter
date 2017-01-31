@@ -14,14 +14,14 @@ import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.concurrent.*;
 
-public class FileSystemMonitor {
+public class ModeSelector {
 
     private Path _receivedPath;
     private Path _outcomingPath;
     private Path _sentPath;
     private boolean _isServerRole = false;
 
-    public FileSystemMonitor() {
+    public ModeSelector() {
         _receivedPath = ConfigManager.getReceivedPath();
         _outcomingPath = ConfigManager.getOutcomingPath();
         _sentPath = ConfigManager.getSentPath();
@@ -57,8 +57,6 @@ public class FileSystemMonitor {
             ServerStarter.stopAndExit(0);
         }
 
-        if (true) return;
-
 //        Thread directoryWatcherThread = new Thread(new DirectoryWatcherThread());
 //        //directoryWatcherThread.setDaemon(true);
 //        directoryWatcherThread.start();
@@ -92,7 +90,8 @@ public class FileSystemMonitor {
     private void prepareWorkFolders() {
 
         try {
-            if (!_isServerRole) Files.createDirectories(_outcomingPath);
+//            if (!_isServerRole) Files.createDirectories(_outcomingPath);
+            Files.createDirectories(_outcomingPath);
             Files.createDirectories(_receivedPath);
             Files.createDirectories(_sentPath);
         } catch (FileAlreadyExistsException faee) {
