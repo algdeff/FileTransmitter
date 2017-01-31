@@ -6,7 +6,7 @@
 
     <groupId>algdeff</groupId>
     <artifactId>FileTransmitter</artifactId>
-    <version>0.4-PREALPHA</version>
+    <version>0.6-PREALPHA</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>

@@ -34,15 +34,13 @@ public class NetworkServer {
             _counter = 0;
 
             AsynchronousServerSocketChannel listener = AsynchronousServerSocketChannel.open(_group).bind(hostAddress);
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                    "Server started on: " + listener.getLocalAddress());
+            messageLog("Server started on: " + listener.getLocalAddress());
 
             listener.accept("youID=" + _counter, new CompletionHandler<AsynchronousSocketChannel, String>() {
                 @Override
                 public void completed(AsynchronousSocketChannel channel, String attachment) {
                     try {
-                        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                                "Client connected: " + channel.getRemoteAddress() + " / " + attachment);
+                        messageLog("Client connected: " + channel.getRemoteAddress() + " / " + attachment);
                         _counter++;
                         listener.accept("youID=" + _counter, this);
 
@@ -58,21 +56,26 @@ public class NetworkServer {
                 }
                 @Override
                 public void failed(Throwable exc, String attachment) {
-                    System.out.println("Failed");
+                    messageLog("Failed");
                 }
             });
             _group.awaitTermination(1000, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
-            ie.printStackTrace();
-            System.err.println("InterruptedException");
+            toLog(ie.getMessage());
         } catch (BindException be) {
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                    "Server already running on port: " + hostAddress.getPort());
+            messageLog("Server already running on port: " + hostAddress.getPort());
         } catch (IOException e) {
-            e.printStackTrace();
-            System.err.println("IOException");
+            toLog(e.getMessage());
         }
 
+    }
+
+    private void messageLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
+    }
+
+    private void toLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_RECORD, message);
     }
 
 }

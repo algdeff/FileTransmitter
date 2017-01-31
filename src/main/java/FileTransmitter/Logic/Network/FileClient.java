@@ -71,18 +71,15 @@ public class FileClient {
                     isConnected = true;
                 } catch (ExecutionException | InterruptedException ee) {
                     _clientSocketChannel.close();
-                    Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                            "Connecting to server: " + hostAddress + "......");
+                    messageLog("Connecting to server: " + hostAddress + "......");
                     try {
                         TimeUnit.SECONDS.sleep(10);
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+                        toLog(e.getMessage());
                     }
                 }
             }
-
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                    "Connected to server " + hostAddress);
+            messageLog("Connected to server " + hostAddress);
 
             OutputStream outputStream = Channels.newOutputStream(_clientSocketChannel);
             _objectOutputStream = new ObjectOutputStream(outputStream);
@@ -99,9 +96,18 @@ public class FileClient {
 //            objectOutputStream.close();
 //            clientSocketChannel.close();
         } catch (IOException e) {
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                    "Server breakdown!");
+            messageLog("Server breakdown!");
         }
+
+    }
+
+    private void printMenu() {
+        messageLog(    "   You choice: \n" +
+                      "1. Send file to server\n" +
+                      "2. Receive file from server\n" +
+                      "3. List server files\n" +
+                      "4. List client files to send\n" +
+                      "5. Terminate the program\n");
     }
 
     private class ClientInterface implements  Runnable {
@@ -113,20 +119,14 @@ public class FileClient {
 
         private void clientCommandListener() {
             while (true) {
+                printMenu();
 
-                Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                          "   You choice: \n" +
-                                "1. Send file to server\n" +
-                                "2. Receive file from server\n" +
-                                "3. List server files\n" +
-                                "4. List client files to send\n" +
-                                "5. Terminate the program\n");
                 BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
                 String choice = "";
                 try {
                     choice = stdin.readLine();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    toLog(e.getMessage());
                 }
 
                 switch (choice) {
@@ -156,22 +156,19 @@ public class FileClient {
         }
 
         private void sendFileToServer() {
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                    "[SendFileToServer]");
+            messageLog("[SendFileToServer]");
             for (String file : getClientOutcommingPathContent()) {
                 int index = _clientFileListCache.indexOf(file);
-                Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                        String.format("%1$s: %2$s", index, file));
+                messageLog(String.format("%1$s: %2$s", index, file));
             }
+            messageLog("Select file index to send it to the server: ");
 
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                    "Select file index to send it to the server: ");
             BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
             String choice = "";
             try {
                 choice = stdin.readLine();
             } catch (IOException e) {
-                e.printStackTrace();
+                toLog(e.getMessage());
             }
             int selectedIndex = Integer.parseInt(choice);
 
@@ -181,7 +178,7 @@ public class FileClient {
             try {
                 fileContent = Files.readAllBytes(fileToSend);
             } catch (IOException e) {
-                e.printStackTrace();
+                toLog(e.getMessage());
             }
             long fileSize = fileContent.length;
 
@@ -196,22 +193,21 @@ public class FileClient {
         }
 
         private void receiveFileFromServer() {
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                    "[ReceiveFileFromServer]");
+            messageLog("[ReceiveFileFromServer]");
             if (_serverFileListCache.size() == 0) return;
 
             for (String file : _serverFileListCache) {
                 int index = _serverFileListCache.indexOf(file);
-                System.err.println(String.format("%1$s: %2$s", index, file));
+                messageLog(String.format("%1$s: %2$s", index, file));
             }
 
-            System.out.println("Select index of server file to receive it: ");
+            messageLog("Select index of server file to receive it: ");
             BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
             String choice = "";
             try {
                 choice = stdin.readLine();
             } catch (IOException e) {
-                e.printStackTrace();
+                toLog(e.getMessage());
             }
             int selectedIndex = Integer.parseInt(choice);
 
@@ -223,22 +219,18 @@ public class FileClient {
         }
 
         private void listServerFiles() {
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                    "[ListServerFiles]");
+            messageLog("[ListServerFiles]");
             PublisherEvent eventToServer = new PublisherEvent(Facade.CMD_SERVER_GET_FILES_LIST).toServerCommand();
-//            System.out.println(eventToServer.getName());
             sendEventToServer(eventToServer);
 
         }
 
         private void printListClientFilesToSend() {
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                    "[ListClientFilesToSend]");
+            messageLog("[ListClientFilesToSend]");
             List<String> fileList = getClientOutcommingPathContent();
             for (String file : fileList) {
                 int index = fileList.indexOf(file);
-                Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                        String.format("%1$s: %2$s", index, file));
+                messageLog(String.format("%1$s: %2$s", index, file));
             }
         }
 
@@ -253,8 +245,8 @@ public class FileClient {
                     fileList.add(file.toString());
                 }
 
-            } catch (IOException ioe) {
-                System.err.println("directoryWalking: ioe");
+            } catch (IOException e) {
+                toLog(e.getMessage());
             }
 
             _clientFileListCache.clear();
@@ -268,12 +260,14 @@ public class FileClient {
             try {
                 _objectOutputStream.writeObject(eventToServer);
             } catch (IOException e) {
-                e.printStackTrace();
+                toLog(e.getMessage());
             }
         }
 
     }
 
+
+    //=================================================================================
 
     private class ServerEventMonitor implements Runnable {
 
@@ -285,32 +279,38 @@ public class FileClient {
         private void serverCommandListener() {
             while (true) {
                 try {
-                    PublisherEvent eventFromServer = (PublisherEvent) _objectInputStream.readObject();
+                    Object receivedObject = _objectInputStream.readObject();
+
+                    if (!receivedObject.getClass().getName().equals(PublisherEvent.class.getName())) {
+                        messageLog("Incorrect event object type");
+                        continue;
+                    }
+                    PublisherEvent eventFromServer = (PublisherEvent) receivedObject;
 
                     if (!eventFromServer.getType().equals(Facade.EVENT_TYPE_SERVERGROUP_CMD)) {
-                        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                                "WRONG EVENT TYPE!");
-                        break;
+                        messageLog("WRONG EVENT TYPE: " + eventFromServer.getType());
+                        continue;
                     }
                     String command = eventFromServer.getGroupName();
 
                     if (command.equals(Facade.CMD_SERVER_TERMINATE)) {
-                        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                                "CMD_SERVER_TERMINATE");
+                        messageLog("CMD_SERVER_TERMINATE");
                         //clientSocket.close();
                         break;
                     }
                     parseCommandFromServer(eventFromServer);
 
                 } catch (IOException e) {
-
+                    toLog(e.getMessage());
                 } catch (ClassNotFoundException e) {
-                    e.printStackTrace();
+                    toLog(e.getMessage());
                 }
 
             }
 //            System.err.println("echo thread close");
         }
+
+
 
         private void parseCommandFromServer(PublisherEvent eventFromServer) {
             String command = eventFromServer.getGroupName();
@@ -359,11 +359,19 @@ public class FileClient {
 
             for (String file : _serverFileListCache) {
                 int index = _serverFileListCache.indexOf(file);
-                Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                        String.format("%1$s: %2$s", index, file));
+                messageLog(String.format("%1$s: %2$s", index, file));
             }
+            printMenu();
         }
 
+    }
+
+    private void messageLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
+    }
+
+    private void toLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_RECORD, message);
     }
 
 }

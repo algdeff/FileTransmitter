@@ -19,16 +19,16 @@ public final class ConfigManager {
      default: filetransmitter.conf.xml
      */
 
-    private static final String           CONFIG_FILE_PATH = "filetransmitter.conf.xml",
+    private static final String           CONFIG_FILE_PATH  = "filetransmitter.conf.xml",
 
-                                         REMOTE_SERVER_URL = "remote_server_url",
-                                        REMOTE_SERVER_PORT = "remote_server_port",
-                                             RECEIVED_PATH = "received_path",
-                                            OUTCOMING_PATH = "outcoming_path",
-                                                 SENT_PATH = "sent_path",
-                                             LOG_FILE_PATH = "log_file_path_name",
-                                          THREAD_POOL_SIZE = "thread_pool_size",
-                                      OUTCOMING_TYPES_GLOB = "outcoming_file_type_glob";
+                                         REMOTE_SERVER_URL  =  "remote_server_url",
+                                        REMOTE_SERVER_PORT  =  "remote_server_port",
+                                             RECEIVED_PATH  =  "received_path",
+                                            OUTCOMING_PATH  =  "outcoming_path",
+                                                 SENT_PATH  =  "sent_path",
+                                             LOG_FILE_PATH  =  "log_file_path_name",
+                                          THREAD_POOL_SIZE  =  "thread_pool_size",
+                                      OUTCOMING_TYPES_GLOB  =  "outcoming_file_type_glob";
 
     private static final ConcurrentHashMap<String, String> _properties;
 

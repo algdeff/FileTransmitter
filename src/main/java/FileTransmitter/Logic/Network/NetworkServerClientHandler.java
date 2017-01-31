@@ -2,6 +2,7 @@ package FileTransmitter.Logic.Network;
 
 import FileTransmitter.Facade;
 import FileTransmitter.Logic.ConfigManager;
+import FileTransmitter.Logic.ThreadPoolManager;
 import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.Publisher.PublisherEvent;
 import FileTransmitter.ServerStarter;
@@ -13,12 +14,18 @@ import java.nio.channels.Channels;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class NetworkServerClientHandler implements Runnable {
 
     private Path _receivedPath;
     private Path _outcomingPath;
     private Path _sentPath;
+
+    private BlockingQueue<PublisherEvent> _outcomeServerEventsQueue;
 
     private AsynchronousSocketChannel _socketChanhel;
     private ObjectInputStream _objectInputStream;
@@ -29,6 +36,7 @@ public class NetworkServerClientHandler implements Runnable {
         _receivedPath = ConfigManager.getReceivedPath();
         _outcomingPath = ConfigManager.getOutcomingPath();
         _sentPath = ConfigManager.getSentPath();
+        _outcomeServerEventsQueue = new LinkedBlockingQueue<>(50);
     }
 
     @Override
@@ -41,28 +49,26 @@ public class NetworkServerClientHandler implements Runnable {
         try {
             clientAddress = _socketChanhel.getRemoteAddress();
             if (_socketChanhel.isOpen()) {
-                Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                        "New client connected: " + clientAddress);
+                messageLog("New client connected: " + clientAddress);
 
                 InputStream inputStream = Channels.newInputStream(_socketChanhel);
                 _objectInputStream = new ObjectInputStream(inputStream);
 
-                OutputStream outputStream = Channels.newOutputStream(_socketChanhel);
-                _objectOutputStream = new ObjectOutputStream(outputStream);
+//                OutputStream outputStream = Channels.newOutputStream(_socketChanhel);
+//                _objectOutputStream = new ObjectOutputStream(outputStream);
+                outcomeServerEventsQueueInit();
 
                 while (true) {
                     PublisherEvent eventFromClient = (PublisherEvent) _objectInputStream.readObject();
 
                     if (!eventFromClient.getType().equals(Facade.EVENT_TYPE_SERVERGROUP_CMD)) {
-                        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                                "WRONG EVENT TYPE!");
+                        messageLog("WRONG EVENT TYPE!");
                         break;
                     }
                     String command = eventFromClient.getGroupName();
 
                     if (command.equals(Facade.CMD_SERVER_TERMINATE)) {
-                        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                                "CMD_SERVER_TERMINATE");
+                        messageLog("CMD_SERVER_TERMINATE");
                         //clientSocket.close();
                         break;
                     }
@@ -71,13 +77,12 @@ public class NetworkServerClientHandler implements Runnable {
 
 //                clientSocket.shutdownInput();
 //                clientSocket.shutdownOutput();
-                System.err.println("Client (" + clientAddress + ") successfully terminated");
+                messageLog("Client (" + clientAddress + ") successfully terminated");
             }
         } catch (ClassNotFoundException e) {
-            System.err.println("ClassNF Ex");
-            e.printStackTrace();
+            toLog(e.getMessage());
         } catch (IOException e) {
-            System.err.println("Client ("+ clientAddress +") is breakdown!");
+            messageLog("Client ("+ clientAddress +") is breakdown!");
         }
 
         //System.out.println("Client terminated " + clientAddress.toString());
@@ -102,9 +107,20 @@ public class NetworkServerClientHandler implements Runnable {
                 sendServerFileListToClient();
                 break;
             }
+            case Facade.CMD_SERVER_ADD_FUTURE_TASK: {
+                messageLog("Command: " + command);
+                addFutureTaskToPool(eventFromClient);
+                break;
+            }
+
 
         }
 
+    }
+
+    private void addFutureTaskToPool(PublisherEvent eventFromClient) {
+        Callable task = (Callable) eventFromClient.getBody();
+        ThreadPoolManager.getInstance().executeFutureTask(task);
     }
 
     private void saveClientFileToReceivedFolder(PublisherEvent eventFromClient) {
@@ -118,7 +134,7 @@ public class NetworkServerClientHandler implements Runnable {
         try {
             Files.write(filename, fileContent, StandardOpenOption.CREATE);
         } catch (IOException e) {
-            e.printStackTrace();
+            messageLog(e.getMessage());
             ServerStarter.stopAndExit(1);
         }
 
@@ -131,10 +147,9 @@ public class NetworkServerClientHandler implements Runnable {
         try {
             fileContent = Files.readAllBytes(fileToSend);
         } catch (IOException e) {
-            e.printStackTrace();
+            toLog(e.getMessage());
         }
         long fileSize = fileContent.length;
-
 //        System.out.println(filename + " " + fileToSend.toString() + " " + fileSize);
 
         PublisherEvent eventToClient = new PublisherEvent(Facade.CMD_SERVER_GET_FILES, fileContent).toServerCommand();
@@ -147,16 +162,37 @@ public class NetworkServerClientHandler implements Runnable {
         PublisherEvent eventToServer = new PublisherEvent(Facade.CMD_SERVER_GET_FILES_LIST).toServerCommand();
         eventToServer.setBody(getServerOutcommingPathContent());
         sendEventToClient(eventToServer);
+
     }
 
-    private void sendEventToClient(PublisherEvent publisherEvent) {
+    private void sendEventToClient(PublisherEvent publisherEvent) {  //synchronyzed if no queue
         try {
-            _objectOutputStream.writeObject(publisherEvent);
-        } catch (IOException e) {
-            e.printStackTrace();
+            _outcomeServerEventsQueue.put(publisherEvent);
+        } catch (InterruptedException e) {
+            toLog(e.getMessage());
         }
     }
 
+    private void outcomeServerEventsQueueInit() {
+        Thread outcomeQueueThread = new Thread(() -> {
+            OutputStream outputStream = Channels.newOutputStream(_socketChanhel);
+            try {
+                _objectOutputStream = new ObjectOutputStream(outputStream);
+
+                while (true) {
+                    PublisherEvent publisherEvent = _outcomeServerEventsQueue.take();
+                    _objectOutputStream.writeObject(publisherEvent);
+                }
+
+            } catch (InterruptedException | IOException e) {
+                messageLog("Output stream break!");
+            }
+
+        });
+        outcomeQueueThread.setName("outcomeServerEventsQueue");
+        outcomeQueueThread.start();
+
+    }
 
     private List<String> getServerOutcommingPathContent() {
         List<String> fileList = new ArrayList<>();
@@ -169,8 +205,8 @@ public class NetworkServerClientHandler implements Runnable {
                 fileList.add(file.toString());
             }
 
-        } catch (IOException ioe) {
-            System.err.println("directoryWalking: ioe");
+        } catch (IOException e) {
+            toLog("directoryWalking:" + e.getMessage());
         }
 
         return fileList;
@@ -187,4 +223,13 @@ public class NetworkServerClientHandler implements Runnable {
 
         return pathMatcher.matches(pathname.getFileName());
     }
+
+    private void messageLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
+    }
+
+    private void toLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_RECORD, message);
+    }
+
 }
