@@ -1,8 +1,11 @@
-package XmlMonitor.Publisher;
+package FileTransmitter.Publisher;
 
-import XmlMonitor.Publisher.Interfaces.IPublisherEvent;
+import FileTransmitter.Facade;
+import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 
-public class PublisherEvent implements IPublisherEvent {
+import java.io.Serializable;
+
+public class PublisherEvent implements IPublisherEvent, Serializable {
 
     private String _name, _type, _groupName, _className;
     private Object _body;
@@ -15,7 +18,7 @@ public class PublisherEvent implements IPublisherEvent {
         _name = name;
         _body = body;
         _args = (args == null) ? NULL_ARRAY : args;
-        _type = Publisher.EVENT_TYPE_GENERIC;
+        _type = Facade.EVENT_TYPE_GENERIC;
         _groupName = null;
         _className = null;
     }
@@ -26,9 +29,8 @@ public class PublisherEvent implements IPublisherEvent {
         this(name, null, NULL_ARRAY);
     }
 
-
     public String getName() {
-        return _name;
+        return (_name != null) ? _name : "";
     }
     public void setName(String name) {
         _name = name;
@@ -71,4 +73,9 @@ public class PublisherEvent implements IPublisherEvent {
         _className = className;
     }
 
+    public PublisherEvent toServerCommand() {
+        setType(Facade.EVENT_TYPE_SERVERGROUP_CMD);
+        setGroupName(_name);
+        return this;
+    }
 }

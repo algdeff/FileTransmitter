@@ -3,10 +3,16 @@ package FileTransmitter.Logic.Network;
 import FileTransmitter.Logic.ConfigManager;
 
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousServerSocketChannel;
+import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -20,24 +26,32 @@ public class ClientThread implements Runnable {
 
     private Boolean isClosed = false;
     private Socket _clientSocket1;
-    private Socket _clientSocket2;
     private Path _receivedPath;
 
 
-    public ClientThread(Socket sock1, Socket sock2) {
+    public ClientThread(Socket sock1) {
         _clientSocket1 = sock1;
-        _clientSocket2 = sock2;
         _receivedPath = ConfigManager.getReceivedPath();
     }
 
     @Override
     public void run() {
         try {
-            InputStream is = _clientSocket2.getInputStream();
-            ObjectInputStream ois = new ObjectInputStream(is);
+            InputStream inputStream = _clientSocket1.getInputStream();
+            ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
+            DataInputStream dataInputStream = new DataInputStream(inputStream);
+
+            OutputStream outputStream = _clientSocket1.getOutputStream();
+            OutputStreamWriter outputStreamWriter = new OutputStreamWriter(outputStream);
+            BufferedWriter bufferedWriter = new BufferedWriter(outputStreamWriter);
+
+            //objectInputStream.readObject()
+             //dataInputStream.
+
+
             String commandFromClient;
             while (!isClosed) {
-                commandFromClient = ois.readUTF();
+                commandFromClient = objectInputStream.readUTF();
                 //System.out.println("cmd:" + commandFromClient);
                 switch (commandFromClient) {
                     case CMD_RECEIVE_FILE_FROM_CLIENT:
@@ -66,9 +80,8 @@ public class ClientThread implements Runnable {
                 }
 
             }
-            ois.close();
+            objectInputStream.close();
             _clientSocket1.close();
-            _clientSocket2.close();
 
         } catch (IOException ex) {
             Logger.getLogger(ClientThread.class.getName()).log(Level.SEVERE, null, ex);

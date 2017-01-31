@@ -1,6 +1,6 @@
-package XmlMonitor.Publisher;
+package FileTransmitter.Publisher;
 
-import XmlMonitor.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.IListener;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -1,4 +1,4 @@
-package XmlMonitor.Publisher.Interfaces;
+package FileTransmitter.Publisher.Interfaces;
 
 public interface IPublisherEvent {
     public String getName();

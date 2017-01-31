@@ -1,46 +1,104 @@
 package FileTransmitter.Logic;
 
+import FileTransmitter.Logic.Network.FileClient;
+import FileTransmitter.Logic.Network.NetworkServer;
+import FileTransmitter.Logic.Workers.LogFileWorker;
 import FileTransmitter.ServerStarter;
 import FileTransmitter.Logic.Workers.FileProcessingThread;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.concurrent.*;
 
 public class FileSystemMonitor {
 
-    private Path _monitoringPath;
+    private Path _receivedPath;
+    private Path _outcomingPath;
     private Path _sentPath;
+    private boolean _isServerRole = false;
 
     public FileSystemMonitor() {
+        _receivedPath = ConfigManager.getReceivedPath();
+        _outcomingPath = ConfigManager.getOutcomingPath();
+        _sentPath = ConfigManager.getSentPath();
     }
 
     public void start() {
 
-        _monitoringPath = ConfigManager.getOutcomingPath();
-        _sentPath = ConfigManager.getSentPath();
+        System.out.println("    You choice: \n" +
+                            "1. Start CLIENT role\n" +
+                            "2. Start SERVER role\n" +
+                            "3. Terminate the program\n");
+        BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
+        String choice = "";
+        try {
+            choice = stdin.readLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
+        switch (choice) {
+            case "1": {
+                System.out.println("CLIENT");
+                startClientRole();
+                break;
+            }
+            case "2": {
+                System.out.println("SERVER");
+                startServerRole();
+                break;
+            }
+            case "3": {
+            }
+            ServerStarter.stopAndExit(0);
+        }
+
+        if (true) return;
+
+//        Thread directoryWatcherThread = new Thread(new DirectoryWatcherThread());
+//        //directoryWatcherThread.setDaemon(true);
+//        directoryWatcherThread.start();
+//
+//        Thread directoryWalkingThread = new Thread(new DirecroryWalkingThread());
+//        directoryWalkingThread.start();
+
+    }
+
+    private void startClientRole() {
+        _isServerRole = false;
         prepareWorkFolders();
 
-        Thread directoryWatcherThread = new Thread(new DirectoryWatcherThread());
-        //directoryWatcherThread.setDaemon(true);
-        directoryWatcherThread.start();
+        FileClient fileClient = new FileClient(
+                ConfigManager.getRemoteServerURL(),
+                ConfigManager.getRemoteServerPort());
+        fileClient.start();
 
-        Thread directoryWalkingThread = new Thread(new DirecroryWalkingThread());
-        directoryWalkingThread.start();
+    }
+
+    private void startServerRole() {
+        _isServerRole = true;
+        prepareWorkFolders();
+
+        NetworkServer networkServer = new NetworkServer(
+                ConfigManager.getRemoteServerPort());
+        networkServer.start();
 
     }
 
     private void prepareWorkFolders() {
 
         try {
-            Files.createDirectories(_monitoringPath);
+            if (!_isServerRole) Files.createDirectories(_outcomingPath);
+            Files.createDirectories(_receivedPath);
             Files.createDirectories(_sentPath);
         } catch (FileAlreadyExistsException faee) {
             System.err.println("Please rename this files: "
-                    + _monitoringPath + " or " + _sentPath);
+                    + _receivedPath + ", " + _outcomingPath
+                    + " or " + _sentPath);
             ServerStarter.stopAndExit(1);
         } catch (IOException ioe) {
             ioe.printStackTrace();
@@ -48,102 +106,91 @@ public class FileSystemMonitor {
 
     }
 
-    private boolean isCorrectFile(Path pathname) {
-        if (Files.isSymbolicLink(pathname)
-                || !Files.isWritable(pathname)
-                || Files.isDirectory(pathname)) return false;
-
-        PathMatcher pathMatcher = FileSystems.getDefault()
-                .getPathMatcher("glob:" + ConfigManager
-                        .getOutcomingTypesGlob());
-
-        return pathMatcher.matches(pathname.getFileName());
-    }
 
 
-    private class DirecroryWalkingThread implements Runnable {
-
-        @Override
-        public void run() {
-            try {
-                directoryWalking();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-        }
-
-        private void directoryWalking() throws Exception {
-
-            try {
-                //Path filename = Files.walkFileTree(pathName, new FindFileVisitor(SEARCH_GLOB));
-                DirectoryStream<Path> directoryStream = Files.newDirectoryStream(_monitoringPath, ConfigManager
-                        .getOutcomingTypesGlob());
-                for (Path file : directoryStream) {
-                    //if (Files.isDirectory(file)) continue;
-                    if (!isCorrectFile(file)) continue;
-                    ThreadPoolManager.getInstance().executeFutureTask(new FileProcessingThread(file));
-                }
-
-            } catch (IOException ioe) {
-                System.err.println("directoryWalking: ioe");
-            }
-
-        }
-
-    }
-
-
-    private class DirectoryWatcherThread implements Runnable {
-
-        @Override
-        public void run() {
-            try {
-                startWatcher();
-            } catch (Exception e) {
-                e.printStackTrace();
-                ServerStarter.stopAndExit(1);
-            }
-        }
-
-        private void startWatcher() throws Exception {
-            Path watchDirectory = _monitoringPath;
-            WatchService watchService = null;
-
-            try {
-                watchService = watchDirectory.getFileSystem().newWatchService();
-                watchDirectory.register(watchService,
-                        StandardWatchEventKinds.ENTRY_CREATE);
-            } catch (IOException e1) {
-                e1.printStackTrace();
-            }
-
-            while (true) {
-                WatchKey key = null;
-                try {
-                    key = watchService.take();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                for (WatchEvent event : key.pollEvents()) {
-                    if (event.context() == null) {
-                        System.err.println("Some files in progress..");
-                        continue;
-                    }
-                    fileProcessing(Paths.get(watchDirectory.toString() , event.context().toString()));
-                }
-                key.reset();
-            }
-
-        }
-
-        private void fileProcessing(Path filePath) {
-            if (!isCorrectFile(filePath)) return;
-            ThreadPoolManager.getInstance().executeFutureTask(new FileProcessingThread(filePath));
-        }
-
-    }
+//    private class DirecroryWalkingThread implements Runnable {
+//
+//        @Override
+//        public void run() {
+//            try {
+//                directoryWalking();
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//
+//        }
+//
+//        private void directoryWalking() throws Exception {
+//
+//            try {
+//                //Path filename = Files.walkFileTree(pathName, new FindFileVisitor(SEARCH_GLOB));
+//                DirectoryStream<Path> directoryStream = Files.newDirectoryStream(_outcomingPath, ConfigManager
+//                        .getOutcomingTypesGlob());
+//                for (Path file : directoryStream) {
+//                    //if (Files.isDirectory(file)) continue;
+//                    if (!isCorrectFile(file)) continue;
+//                    ThreadPoolManager.getInstance().executeFutureTask(new FileProcessingThread(file));
+//                }
+//
+//            } catch (IOException ioe) {
+//                System.err.println("directoryWalking: ioe");
+//            }
+//
+//        }
+//
+//    }
+//
+//
+//    private class DirectoryWatcherThread implements Runnable {
+//
+//        @Override
+//        public void run() {
+//            try {
+//                startWatcher();
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//                ServerStarter.stopAndExit(1);
+//            }
+//        }
+//
+//        private void startWatcher() throws Exception {
+//            Path watchDirectory = _outcomingPath;
+//            WatchService watchService = null;
+//
+//            try {
+//                watchService = watchDirectory.getFileSystem().newWatchService();
+//                watchDirectory.register(watchService,
+//                        StandardWatchEventKinds.ENTRY_CREATE);
+//            } catch (IOException e1) {
+//                e1.printStackTrace();
+//            }
+//
+//            while (true) {
+//                WatchKey key = null;
+//                try {
+//                    key = watchService.take();
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+//
+//                for (WatchEvent event : key.pollEvents()) {
+//                    if (event.context() == null) {
+//                        System.err.println("Some files in progress..");
+//                        continue;
+//                    }
+//                    fileProcessing(Paths.get(watchDirectory.toString() , event.context().toString()));
+//                }
+//                key.reset();
+//            }
+//
+//        }
+//
+//        private void fileProcessing(Path filePath) {
+//            if (!isCorrectFile(filePath)) return;
+//            ThreadPoolManager.getInstance().executeFutureTask(new FileProcessingThread(filePath));
+//        }
+//
+//    }
 
 }
 

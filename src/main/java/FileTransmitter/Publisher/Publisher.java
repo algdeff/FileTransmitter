@@ -1,25 +1,30 @@
-package XmlMonitor.Publisher;
+package FileTransmitter.Publisher;
 
-import XmlMonitor.Publisher.Interfaces.IListener;
-import XmlMonitor.Publisher.Interfaces.IPublisherEvent;
+import FileTransmitter.Facade;
+import FileTransmitter.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public final class Publisher {
 
-    private Map<String, ListenerContext> _listeners; //Key = registered listener Class name from object.toString, Values = listener object included listener class link
-    private Map<String, List<String>> _listenersEventMap; //Key = eventName, Value = listener Class name;
+    /**
+     *                          _listeners
+     *      Key = registered listener Class name from object.toString,
+     *   Values = listener object included listener class link
+     *
+     *                      _listenersEventMap
+     *         Key = eventName, Value = listener Class name;
+     */
+    private static ConcurrentMap<String, ListenerContext> _listeners;
+    private static ConcurrentMap<String, List<String>> _listenersEventMap;
     private static volatile Publisher instance;
 
-    public static final String LISTEN_ALL_EVENTS = "listen_all_events";
-
-    public static final String EVENT_TYPE_BROADCAST =   "broadcast_event";
-    public static final String EVENT_TYPE_GROUP =       "group_event";
-    public static final String EVENT_TYPE_GENERIC =     "generic_event";
-
     private Publisher() {
-        _listeners = new HashMap<>();
-        _listenersEventMap = new HashMap<>();
+        _listeners = new ConcurrentHashMap<>();
+        _listenersEventMap = new ConcurrentHashMap<>();
 
     }
 
@@ -137,7 +142,13 @@ public final class Publisher {
 //        return false;
     }
 
+    private Object blankObject() {
+        return new Object();
+    }
 
+    public void sendPublisherEvent(String event_name) {
+        sendPublisherEvent(new PublisherEvent(event_name, blankObject()));
+    }
     public void sendPublisherEvent(String event_name, Object body) {
         sendPublisherEvent(new PublisherEvent(event_name, body));
     }
@@ -146,7 +157,7 @@ public final class Publisher {
         List<String> listeners = _listenersEventMap.get(eventName);
 
         if (listeners == null) {
-            System.out.println("This event is not registered");
+            System.out.println("Publisher: this event is not registered");
             return;
         }
 
@@ -162,10 +173,13 @@ public final class Publisher {
         }
     }
 
+    public void sendGroupEvent(String target_group, Object body) {
+        sendGroupEvent(new PublisherEvent(null, body), target_group);
+    }
     public void sendGroupEvent(IPublisherEvent publisherEvent, String target_group) {
         for (ListenerContext context : _listeners.values()) {
             if (context.getGroupName().equals(target_group)) {
-                publisherEvent.setType(EVENT_TYPE_GROUP);
+                publisherEvent.setType(Facade.EVENT_TYPE_GROUP);
                 publisherEvent.setGroupName(target_group);
                 publisherEvent.setClassName(context.getClassName());
                 context.getListener().listenerHandler(publisherEvent);
@@ -175,7 +189,7 @@ public final class Publisher {
 
     public void sendBroadcastEvent(IPublisherEvent publisherEvent) {
         for (ListenerContext context : _listeners.values()) {
-            publisherEvent.setType(EVENT_TYPE_BROADCAST);
+            publisherEvent.setType(Facade.EVENT_TYPE_BROADCAST);
             publisherEvent.setGroupName(context.getGroupName());
             publisherEvent.setClassName(context.getClassName());
             context.getListener().listenerHandler(publisherEvent);
