@@ -2,6 +2,7 @@ package FileTransmitter.Logic.Network;
 
 import FileTransmitter.Facade;
 import FileTransmitter.Logic.ConfigManager;
+import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.Publisher.PublisherEvent;
 import FileTransmitter.ServerStarter;
 
@@ -40,7 +41,8 @@ public class NetworkServerClientHandler implements Runnable {
         try {
             clientAddress = _socketChanhel.getRemoteAddress();
             if (_socketChanhel.isOpen()) {
-                System.err.println("New client connected: " + clientAddress);
+                Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
+                        "New client connected: " + clientAddress);
 
                 InputStream inputStream = Channels.newInputStream(_socketChanhel);
                 _objectInputStream = new ObjectInputStream(inputStream);
@@ -51,35 +53,22 @@ public class NetworkServerClientHandler implements Runnable {
                 while (true) {
                     PublisherEvent eventFromClient = (PublisherEvent) _objectInputStream.readObject();
 
-                    System.out.println(eventFromClient.getName() + "/"
-                            + eventFromClient.getType() + "/"
-                            + eventFromClient.getGroupName());
-
                     if (!eventFromClient.getType().equals(Facade.EVENT_TYPE_SERVERGROUP_CMD)) {
-                        System.err.println("WRONG EVENT TYPE!");
+                        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
+                                "WRONG EVENT TYPE!");
                         break;
                     }
                     String command = eventFromClient.getGroupName();
 
                     if (command.equals(Facade.CMD_SERVER_TERMINATE)) {
-                        System.err.println("CMD_SERVER_TERMINATE");
-//                        objectOutputStream.writeObject("READ OK" + object.toString());
+                        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
+                                "CMD_SERVER_TERMINATE");
                         //clientSocket.close();
                         break;
                     }
-
-//                    System.err.println("Received from client (" + clientAddress + "):\n" + object);
-
-                    ///////add check type STR?PublisherEvt to client///////_objectOutputStream.writeObject("ECHO: Received from client: " + eventFromClient.getGroupName());
-
                     parseCommandFromClient(eventFromClient);
                 }
 
-//                objectOutputStream.close();
-//                objectInputStream.close();
-//                inputStream.close();
-//                outputStream.close();
-//                clientSocket.close();
 //                clientSocket.shutdownInput();
 //                clientSocket.shutdownOutput();
                 System.err.println("Client (" + clientAddress + ") successfully terminated");
@@ -92,10 +81,6 @@ public class NetworkServerClientHandler implements Runnable {
         }
 
         //System.out.println("Client terminated " + clientAddress.toString());
-
-//        ByteBuffer bb = ByteBuffer.allocate(16364);
-//        result.read(bb);
-//        System.out.println(new String(bb.array()));
     }
 
     private void parseCommandFromClient(PublisherEvent eventFromClient) {
@@ -103,17 +88,17 @@ public class NetworkServerClientHandler implements Runnable {
 
         switch (command) {
             case Facade.CMD_SERVER_ADD_FILES: {
-                System.err.println("Command: " + command);
+//                System.err.println("Command: " + command);
                 saveClientFileToReceivedFolder(eventFromClient);
                 break;
             }
             case Facade.CMD_SERVER_GET_FILES: {
-                System.err.println("Command: " + command);
+//                System.err.println("Command: " + command);
                 sendServerFileToClient((String) eventFromClient.getBody());
                 break;
             }
             case Facade.CMD_SERVER_GET_FILES_LIST: {
-                System.err.println("Command: " + command);
+//                System.err.println("Command: " + command);
                 sendServerFileListToClient();
                 break;
             }
@@ -128,7 +113,7 @@ public class NetworkServerClientHandler implements Runnable {
 
         byte[] fileContent = (byte[]) eventFromClient.getBody();
 
-        System.out.println("+++" + fileContent.length);
+//        System.out.println("+++" + fileContent.length);
 
         try {
             Files.write(filename, fileContent, StandardOpenOption.CREATE);
@@ -150,7 +135,7 @@ public class NetworkServerClientHandler implements Runnable {
         }
         long fileSize = fileContent.length;
 
-        System.out.println(filename + " " + fileToSend.toString() + " " + fileSize);
+//        System.out.println(filename + " " + fileToSend.toString() + " " + fileSize);
 
         PublisherEvent eventToClient = new PublisherEvent(Facade.CMD_SERVER_GET_FILES, fileContent).toServerCommand();
         eventToClient.setArgs(fileToSend.toString(), fileSize);
@@ -182,7 +167,6 @@ public class NetworkServerClientHandler implements Runnable {
             for (Path file : directoryStream) {
 //                if (!isCorrectFile(file)) continue;
                 fileList.add(file.toString());
-//                ThreadPoolManager.getInstance().executeFutureTask(new FileProcessingThread(file));
             }
 
         } catch (IOException ioe) {

@@ -126,8 +126,7 @@ public class LogFileWorker implements IListener {
         switch (publisherEvent.getName()) {
             case Facade.CMD_LOGGER_ADD_LOG: {
                 addLog(publisherEvent.getBody().toString());
-                System.err.println(getDateTimeNow() + " - Logger event ("
-                        + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
+                System.err.println(publisherEvent.getBody().toString());
                 break;
 
             }

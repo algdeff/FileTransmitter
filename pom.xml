@@ -6,7 +6,7 @@
 
     <groupId>algdeff</groupId>
     <artifactId>FileTransmitter</artifactId>
-    <version>0.1-PREALPHA</version>
+    <version>0.4-PREALPHA</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -24,12 +24,12 @@
 
 
         <!-- https://mvnrepository.com/artifact/io.netty/netty-all -->
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-            <version>4.1.7.Final</version>
-            <!--<version>4.0.0.CR3</version>-->
-        </dependency>
+        <!--<dependency>-->
+            <!--<groupId>io.netty</groupId>-->
+            <!--<artifactId>netty-all</artifactId>-->
+            <!--<version>4.1.7.Final</version>-->
+            <!--&lt;!&ndash;<version>4.0.0.CR3</version>&ndash;&gt;-->
+        <!--</dependency>-->
 
         <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-configuration2 -->
         <dependency>
@@ -44,7 +44,6 @@
             <artifactId>commons-beanutils</artifactId>
             <version>1.9.3</version>
         </dependency>
-
 
     </dependencies>
 

@@ -15,5 +15,5 @@
     <!--макс. количество параллельных потоков-->
     <thread_pool_size>50</thread_pool_size>
     <!--маски автоматически отправляемых файлов-->
-    <outcoming_file_type_glob>*.{zip,txt,xml}</outcoming_file_type_glob>
+    <outcoming_file_type_glob>*.{zip,txt,xml,exe,doc}</outcoming_file_type_glob>
 </xmlmonitor-configuration>

@@ -1,5 +1,8 @@
 package FileTransmitter.Logic.Network;
 
+import FileTransmitter.Facade;
+import FileTransmitter.Publisher.Publisher;
+
 import java.io.*;
 import java.net.*;
 import java.nio.channels.*;
@@ -19,7 +22,6 @@ public class NetworkServer {
 
 
     public void start() {
-
         startServerEngine();
 
     }
@@ -32,25 +34,22 @@ public class NetworkServer {
             _counter = 0;
 
             AsynchronousServerSocketChannel listener = AsynchronousServerSocketChannel.open(_group).bind(hostAddress);
-            System.err.println("Server started on: " + listener.getLocalAddress());
+            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
+                    "Server started on: " + listener.getLocalAddress());
 
             listener.accept("youID=" + _counter, new CompletionHandler<AsynchronousSocketChannel, String>() {
                 @Override
                 public void completed(AsynchronousSocketChannel channel, String attachment) {
                     try {
-                        System.err.println("Client connected: " + channel.getRemoteAddress() + " / " + attachment);
-
+                        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
+                                "Client connected: " + channel.getRemoteAddress() + " / " + attachment);
                         _counter++;
-                        System.err.println("Counter increment, current value: " + _counter);
-
                         listener.accept("youID=" + _counter, this);
 
                         //clientHandle(channel);
                         new Thread(new NetworkServerClientHandler(channel)).start();
 
-
-                        System.err.println("Client terminated: " + channel.toString());
-
+                        //System.err.println("Client terminated: " + channel.toString());
                         //channel.close();
 
                     } catch (IOException e) {
@@ -67,7 +66,8 @@ public class NetworkServer {
             ie.printStackTrace();
             System.err.println("InterruptedException");
         } catch (BindException be) {
-            System.err.println("Server already running on port: " + hostAddress.getPort());
+            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
+                    "Server already running on port: " + hostAddress.getPort());
         } catch (IOException e) {
             e.printStackTrace();
             System.err.println("IOException");

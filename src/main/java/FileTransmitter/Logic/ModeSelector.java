@@ -1,8 +1,10 @@
 package FileTransmitter.Logic;
 
+import FileTransmitter.Facade;
 import FileTransmitter.Logic.Network.FileClient;
 import FileTransmitter.Logic.Network.NetworkServer;
 import FileTransmitter.Logic.Workers.LogFileWorker;
+import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.ServerStarter;
 import FileTransmitter.Logic.Workers.FileProcessingThread;
 
@@ -43,12 +45,10 @@ public class ModeSelector {
 
         switch (choice) {
             case "1": {
-                System.out.println("CLIENT");
                 startClientRole();
                 break;
             }
             case "2": {
-                System.out.println("SERVER");
                 startServerRole();
                 break;
             }
@@ -67,6 +67,9 @@ public class ModeSelector {
     }
 
     private void startClientRole() {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
+                "StartClientRole");
+
         _isServerRole = false;
         prepareWorkFolders();
 
@@ -78,6 +81,8 @@ public class ModeSelector {
     }
 
     private void startServerRole() {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
+                "StartServerRole");
         _isServerRole = true;
         prepareWorkFolders();
 
