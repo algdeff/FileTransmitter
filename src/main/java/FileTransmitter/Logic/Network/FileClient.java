@@ -2,6 +2,8 @@ package FileTransmitter.Logic.Network;
 
 import FileTransmitter.Facade;
 import FileTransmitter.Logic.ConfigManager;
+import FileTransmitter.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.Publisher.PublisherEvent;
 import FileTransmitter.ServerStarter;
@@ -31,6 +33,8 @@ public class FileClient {
     private String _remoteServerUrl;
     private int _remoteServerPort;
 
+    private BlockingQueue<PublisherEvent> _outcomeClientEventsQueue;
+
     private AsynchronousSocketChannel _clientSocketChannel;
     private ObjectOutputStream _objectOutputStream;
     private ObjectInputStream _objectInputStream;
@@ -44,6 +48,7 @@ public class FileClient {
         _receivedPath = ConfigManager.getReceivedPath();
         _outcomingPath = ConfigManager.getOutcomingPath();
         _sentPath = ConfigManager.getSentPath();
+        _outcomeClientEventsQueue = new LinkedBlockingQueue<>(50);
         _serverFileListCache = new ArrayList<>();
         _clientFileListCache = new ArrayList<>();
         _clientSocketChannel = null;
@@ -81,9 +86,7 @@ public class FileClient {
             }
             messageLog("Connected to server " + hostAddress);
 
-            OutputStream outputStream = Channels.newOutputStream(_clientSocketChannel);
-            _objectOutputStream = new ObjectOutputStream(outputStream);
-
+            outcomeClientEventsQueueInit();
             InputStream inputStream = Channels.newInputStream(_clientSocketChannel);
             _objectInputStream = new ObjectInputStream(inputStream);
 
@@ -107,7 +110,9 @@ public class FileClient {
                       "2. Receive file from server\n" +
                       "3. List server files\n" +
                       "4. List client files to send\n" +
-                      "5. Terminate the program\n");
+                      "5. Send task to executor\n" +
+                      "6. Transition event demo\n" +
+                      "7. Terminate the program\n");
     }
 
     private class ClientInterface implements  Runnable {
@@ -147,6 +152,14 @@ public class FileClient {
                         break;
                     }
                     case "5": {
+                        sendTaskToExecutor();
+                        break;
+                    }
+                    case "6": {
+                        transitionEventDemo();
+                        break;
+                    }
+                    case "7": {
                     }
                     ServerStarter.stopAndExit(0);
                 }
@@ -188,7 +201,6 @@ public class FileClient {
             eventToServer.setArgs(fileToSend.getFileName().toString(), fileSize);
 //            System.out.println(eventToServer.getName());
             sendEventToServer(eventToServer);
-
 
         }
 
@@ -234,6 +246,23 @@ public class FileClient {
             }
         }
 
+        private void sendTaskToExecutor() {
+
+            System.out.println("TASK SENDED To EXECUTOR");
+
+        }
+
+        private void transitionEventDemo() {
+            messageLog("[Transition event demo...]");
+            PublisherEvent publisherEvent = new PublisherEvent(Facade.CMD_EXECUTOR_PUT_TASK,
+                    "CLIENT: THIS OUTCOME MESSAGE send to EXECUTOR_PUT_TASK")
+                    .addServerCommand(Facade.CMD_SERVER_TRANSITION_EVENT);
+//            PublisherEvent publisherEvent = new PublisherEvent(Facade.EVENT_GROUP_EXECUTOR,
+//                    "HELOO FROM CLIENT").addServerCommand(Facade.CMD_SERVER_ADD_FUTURE_TASK);
+//            publisherEvent.setType(Facade.EVENT_TYPE_GROUP);
+            sendEventToServer(publisherEvent);
+        }
+
         private List<String> getClientOutcommingPathContent() {
             List<String> fileList = new ArrayList<>();
 
@@ -255,13 +284,13 @@ public class FileClient {
             return fileList;
         }
 
-        private void sendEventToServer(PublisherEvent eventToServer) {
-
+        private void sendEventToServer(PublisherEvent publisherEvent) {  //synchronyzed if no queue
             try {
-                _objectOutputStream.writeObject(eventToServer);
-            } catch (IOException e) {
+                _outcomeClientEventsQueue.put(publisherEvent);
+            } catch (InterruptedException e) {
                 toLog(e.getMessage());
             }
+
         }
 
     }
@@ -287,13 +316,12 @@ public class FileClient {
                     }
                     PublisherEvent eventFromServer = (PublisherEvent) receivedObject;
 
-                    if (!eventFromServer.getType().equals(Facade.EVENT_TYPE_SERVERGROUP_CMD)) {
-                        messageLog("WRONG EVENT TYPE: " + eventFromServer.getType());
+                    if (eventFromServer.getServerCommand() == null) {
+                        messageLog("No server command found in event: " + eventFromServer.getName());
                         continue;
                     }
-                    String command = eventFromServer.getGroupName();
 
-                    if (command.equals(Facade.CMD_SERVER_TERMINATE)) {
+                    if (eventFromServer.getServerCommand().equals(Facade.CMD_SERVER_TERMINATE)) {
                         messageLog("CMD_SERVER_TERMINATE");
                         //clientSocket.close();
                         break;
@@ -313,29 +341,37 @@ public class FileClient {
 
 
         private void parseCommandFromServer(PublisherEvent eventFromServer) {
-            String command = eventFromServer.getGroupName();
 
-            switch (command) {
+            switch (eventFromServer.getServerCommand()) {
                 case Facade.CMD_SERVER_ADD_FILES: {
 
 //                    System.err.println("Command: " + command);
-                    break;
+                    return;
                 }
                 case Facade.CMD_SERVER_GET_FILES: {
 //                    System.err.println("Command: " + command);
                     saveServerFileToReceivedFolder(eventFromServer);
-                    break;
+                    return;
                 }
                 case Facade.CMD_SERVER_GET_FILES_LIST: {
 //                    System.err.println("Command: " + command);
                     _serverFileListCache.clear();
                     _serverFileListCache.addAll((List<String>) eventFromServer.getBody());
                     printListFilesFromServer();
-                    break;
+                    return;
+                }
+                case Facade.CMD_SERVER_TRANSITION_EVENT: {
+                    publishTransitionEvent(eventFromServer);
+                    return;
                 }
 
             }
+            messageLog("Incorrect server command: " + eventFromServer.getServerCommand());
 
+        }
+
+        private void publishTransitionEvent(PublisherEvent eventFromServer) {
+            Publisher.getInstance().sendPublisherEvent(eventFromServer.toGenericEvent());
         }
 
         private void saveServerFileToReceivedFolder(PublisherEvent eventFromServer) {
@@ -363,6 +399,28 @@ public class FileClient {
             }
             printMenu();
         }
+
+    }
+
+    private void outcomeClientEventsQueueInit() {
+
+        Thread outcomeQueueThread = new Thread(() -> {
+            OutputStream outputStream = Channels.newOutputStream(_clientSocketChannel);
+            try {
+                _objectOutputStream = new ObjectOutputStream(outputStream);
+
+                while (true) {
+                    PublisherEvent publisherEvent = _outcomeClientEventsQueue.take();
+                    _objectOutputStream.writeObject(publisherEvent);
+                }
+
+            } catch (InterruptedException | IOException e) {
+                messageLog("Output stream break!");
+            }
+
+        });
+        outcomeQueueThread.setName("outcomeServerEventsQueue");
+        outcomeQueueThread.start();
 
     }
 

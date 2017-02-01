@@ -3,25 +3,35 @@ package FileTransmitter;
 public final class Facade {
 
     public static final String  EVENT_TYPE_BROADCAST  =  "event_type_broadcast",
+                                 EVENT_TYPE_SPECIFIC  =  "event_type_to_specific_reg_name",
                                     EVENT_TYPE_GROUP  =  "event_type_group",
+                                EVENT_TYPE_SUBSCRIBE  =  "event_type_subscribe_interests",
                                   EVENT_TYPE_GENERIC  =  "event_type_generic",
                           EVENT_TYPE_SERVERGROUP_CMD  =  "event_type_servergroup_cmd",
 
                                      EVENT_GROUP_ALL  =  "event_group_all",
                                   EVENT_GROUP_LOGGER  =  "logger_group_event",
                                       EVENT_GROUP_DB  =  "database_manager_group_event",
+                                EVENT_GROUP_EXECUTOR  =  "event_group_executor",
+                              EVENT_GROUP_NET_SERVER  =  "event_group_net_server",
+                              EVENT_GROUP_NET_CLIENT  =  "event_group_net_client",
 
                                         CMD_DB_FLUSH  =  "cmd_db_flush",
                                      CMD_DB_SHUTDOWN  =  "cmd_db_shutdown",
+
+                               CMD_EXECUTOR_PUT_TASK  =  "cmd_executor_put_task",
+                              CMD_EXECUTOR_TAKE_TASK  =  "cmd_executor_take_task",
 
                                   CMD_LOGGER_ADD_LOG  =  "cmd_logger_add_log",
                                CMD_LOGGER_ADD_RECORD  =  "cmd_logger_add_record",
                                 CMD_LOGGER_CLEAR_LOG  =  "cmd_logger_clear_log",
 
+//           CMD_SERVER_INTERNAL_SEND_TRANSITION_EVENT  =  "cmd_server_internal_send_transition_event",
+
                            CMD_SERVER_GET_FILES_LIST  =  "cmd_server_get_files_list",
                                 CMD_SERVER_GET_FILES  =  "cmd_server_get_files",
                                 CMD_SERVER_ADD_FILES  =  "cmd_server_add_files",
-                          CMD_SERVER_ADD_FUTURE_TASK  =  "cmd_server_add_future_task_",
+                         CMD_SERVER_TRANSITION_EVENT  =  "cmd_server_transition_event",
                                 CMD_SERVER_TERMINATE  =  "cmd_server_terminate";
 
 

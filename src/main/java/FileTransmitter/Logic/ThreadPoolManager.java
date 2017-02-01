@@ -1,10 +1,16 @@
 package FileTransmitter.Logic;
 
+import FileTransmitter.Facade;
+import FileTransmitter.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
+import FileTransmitter.Publisher.Publisher;
+import FileTransmitter.Publisher.PublisherEvent;
+
 import java.util.concurrent.*;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-public final class ThreadPoolManager {
+public final class ThreadPoolManager implements IListener {
 
     private static int _threadsNumber;
     private static PoolWorker[] _threads;
@@ -33,6 +39,8 @@ public final class ThreadPoolManager {
         if (_inited) {
             return;
         }
+
+        registerOnPublisher();
         _threadsNumber = threadsNumber;
         _queue = new ConcurrentLinkedQueue<>();
         _threads = new PoolWorker[threadsNumber];
@@ -51,6 +59,51 @@ public final class ThreadPoolManager {
         _inited = true;
     }
 
+    private void sendCompleteTask() {
+
+//                Callable task = (Callable) publisherEvent.getBody();
+//                executeFutureTask(task);
+
+
+//        new Thread(() -> {
+//
+//            Callable task = (Callable) publisherEvent.getBody();
+//            executeFutureTask(task);
+//
+//            while (true) {
+//
+//            Future future = getCompletionFutureTask();
+//
+//            PublisherEvent publisherEvent = new PublisherEvent(Facade.CMD_LOGGER_CLEAR_LOG, future).addServerCommand(Facade.CMD_SERVER_ADD_FUTURE_TASK);
+//            sendEventToClient(publisherEvent);
+//
+////            try {
+////                result = future.get();
+////            } catch (InterruptedException ie) {
+////                ie.printStackTrace();
+////            } catch (ExecutionException ee) {
+////                ee.printStackTrace();
+////            }
+//
+////            Future<ArrayList> future = ThreadPoolManager.getInstance().getCompletionFutureTask();
+////            List<String> result = new ArrayList<>();
+////            try {
+////                result = future.get();
+////            } catch (InterruptedException ie) {
+////                ie.printStackTrace();
+////            } catch (ExecutionException ee) {
+////                ee.printStackTrace();
+////            }
+////
+////            addRecords(result);
+//            }
+//
+//        });
+
+    }
+
+
+
     public void execute(Runnable task) {
         synchronized(_queue) {
             _queue.add(task);
@@ -59,6 +112,7 @@ public final class ThreadPoolManager {
     }
 
     public void executeFutureTask (Callable callable) {
+        System.err.println("ADD TASK");
         _completionService.submit(callable);
     }
 
@@ -69,6 +123,7 @@ public final class ThreadPoolManager {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        System.err.println("COMPLETE TASK");
         return future;
     }
 
@@ -109,6 +164,7 @@ public final class ThreadPoolManager {
     }
 
 
+
     private class PoolWorker extends Thread {
         //@Override
         public void run() {
@@ -135,4 +191,53 @@ public final class ThreadPoolManager {
             }
         }
     }
+
+    private void messageLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
+    }
+
+    private void toLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_RECORD, message);
+    }
+
+    @Override
+    public void registerOnPublisher() {
+        Publisher.getInstance().registerNewListener(this, Facade.EVENT_GROUP_EXECUTOR);
+    }
+
+    @Override
+    public String[] listenerInterests() {
+        return new String[] {
+                Facade.CMD_EXECUTOR_PUT_TASK,
+                Facade.CMD_EXECUTOR_TAKE_TASK
+        };
+    }
+
+    @Override
+    public void listenerHandler(IPublisherEvent publisherEvent) {
+        if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
+            messageLog("Executor received group event ("
+                    + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
+        }
+
+        switch (publisherEvent.getName()) {
+            case Facade.CMD_EXECUTOR_PUT_TASK: {
+                messageLog("[EXECUTOR] command received on CMD_EXECUTOR_PUT_TASK, body: "
+                        + publisherEvent.getBody() + "\nEXECUTOR: sendTransitionEvent to "
+                        + "remote LOGGER_ADD_LOG, contains THIS MESSAGE");
+
+                PublisherEvent outcomeEvent = new PublisherEvent(Facade.CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
+                Publisher.getInstance().sendTransitionEvent(outcomeEvent);
+                break;
+            }
+
+            case Facade.CMD_EXECUTOR_TAKE_TASK: {
+                messageLog("EXECUTOR_TAKE_TASK" + publisherEvent.getBody());
+                break;
+            }
+
+        }
+
+    }
+
 }

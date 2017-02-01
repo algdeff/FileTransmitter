@@ -120,7 +120,7 @@ public class LogFileWorker implements IListener {
         if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
             addLog(publisherEvent.getBody().toString());
             System.err.println(getDateTimeNow() + " - Logger received group event ("
-                    + publisherEvent.getGroupName() + "): \n" + publisherEvent.getBody().toString());
+                    + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
         }
 
         switch (publisherEvent.getName()) {

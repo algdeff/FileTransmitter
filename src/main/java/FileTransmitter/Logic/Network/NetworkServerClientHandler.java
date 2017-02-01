@@ -3,6 +3,8 @@ package FileTransmitter.Logic.Network;
 import FileTransmitter.Facade;
 import FileTransmitter.Logic.ConfigManager;
 import FileTransmitter.Logic.ThreadPoolManager;
+import FileTransmitter.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.Publisher.PublisherEvent;
 import FileTransmitter.ServerStarter;
@@ -14,10 +16,7 @@ import java.nio.channels.Channels;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 public class NetworkServerClientHandler implements Runnable {
 
@@ -27,12 +26,12 @@ public class NetworkServerClientHandler implements Runnable {
 
     private BlockingQueue<PublisherEvent> _outcomeServerEventsQueue;
 
-    private AsynchronousSocketChannel _socketChanhel;
+    private AsynchronousSocketChannel _serverSocketChanhel;
     private ObjectInputStream _objectInputStream;
     private ObjectOutputStream _objectOutputStream;
 
     public NetworkServerClientHandler(AsynchronousSocketChannel socketChanhel) {
-        _socketChanhel = socketChanhel;
+        _serverSocketChanhel = socketChanhel;
         _receivedPath = ConfigManager.getReceivedPath();
         _outcomingPath = ConfigManager.getOutcomingPath();
         _sentPath = ConfigManager.getSentPath();
@@ -47,27 +46,30 @@ public class NetworkServerClientHandler implements Runnable {
     private void clientHandle() {
         SocketAddress clientAddress = null;
         try {
-            clientAddress = _socketChanhel.getRemoteAddress();
-            if (_socketChanhel.isOpen()) {
+            clientAddress = _serverSocketChanhel.getRemoteAddress();
+            if (_serverSocketChanhel.isOpen()) {
                 messageLog("New client connected: " + clientAddress);
 
-                InputStream inputStream = Channels.newInputStream(_socketChanhel);
+                InputStream inputStream = Channels.newInputStream(_serverSocketChanhel);
                 _objectInputStream = new ObjectInputStream(inputStream);
-
-//                OutputStream outputStream = Channels.newOutputStream(_socketChanhel);
-//                _objectOutputStream = new ObjectOutputStream(outputStream);
-                outcomeServerEventsQueueInit();
+                initOutcomeServerEventsQueue();
+                initTransitionEventSender();
 
                 while (true) {
-                    PublisherEvent eventFromClient = (PublisherEvent) _objectInputStream.readObject();
+                    Object receivedObject = _objectInputStream.readObject();
 
-                    if (!eventFromClient.getType().equals(Facade.EVENT_TYPE_SERVERGROUP_CMD)) {
-                        messageLog("WRONG EVENT TYPE!");
-                        break;
+                    if (!receivedObject.getClass().getName().equals(PublisherEvent.class.getName())) {
+                        messageLog("Incorrect event object type");
+                        continue;
                     }
-                    String command = eventFromClient.getGroupName();
+                    PublisherEvent eventFromClient = (PublisherEvent) receivedObject;
 
-                    if (command.equals(Facade.CMD_SERVER_TERMINATE)) {
+                    if (eventFromClient.getServerCommand() == null) {
+                        messageLog("No server command found in event: " + eventFromClient.getName());
+                        continue;
+                    }
+
+                    if (eventFromClient.getServerCommand().equals(Facade.CMD_SERVER_TERMINATE)) {
                         messageLog("CMD_SERVER_TERMINATE");
                         //clientSocket.close();
                         break;
@@ -89,38 +91,35 @@ public class NetworkServerClientHandler implements Runnable {
     }
 
     private void parseCommandFromClient(PublisherEvent eventFromClient) {
-        String command = eventFromClient.getGroupName();
 
-        switch (command) {
+        switch (eventFromClient.getServerCommand()) {
             case Facade.CMD_SERVER_ADD_FILES: {
 //                System.err.println("Command: " + command);
                 saveClientFileToReceivedFolder(eventFromClient);
-                break;
+                return;
             }
             case Facade.CMD_SERVER_GET_FILES: {
 //                System.err.println("Command: " + command);
                 sendServerFileToClient((String) eventFromClient.getBody());
-                break;
+                return;
             }
             case Facade.CMD_SERVER_GET_FILES_LIST: {
 //                System.err.println("Command: " + command);
                 sendServerFileListToClient();
-                break;
+                return;
             }
-            case Facade.CMD_SERVER_ADD_FUTURE_TASK: {
-                messageLog("Command: " + command);
-                addFutureTaskToPool(eventFromClient);
-                break;
+            case Facade.CMD_SERVER_TRANSITION_EVENT: {
+                publishTransitionEvent(eventFromClient);
+                return;
             }
-
 
         }
+        messageLog("Incorrect client command: " + eventFromClient.getServerCommand());
 
     }
 
-    private void addFutureTaskToPool(PublisherEvent eventFromClient) {
-        Callable task = (Callable) eventFromClient.getBody();
-        ThreadPoolManager.getInstance().executeFutureTask(task);
+    private void publishTransitionEvent(PublisherEvent eventFromClient) {
+        Publisher.getInstance().sendPublisherEvent(eventFromClient.toGenericEvent());
     }
 
     private void saveClientFileToReceivedFolder(PublisherEvent eventFromClient) {
@@ -173,9 +172,9 @@ public class NetworkServerClientHandler implements Runnable {
         }
     }
 
-    private void outcomeServerEventsQueueInit() {
+    private void initOutcomeServerEventsQueue() {
         Thread outcomeQueueThread = new Thread(() -> {
-            OutputStream outputStream = Channels.newOutputStream(_socketChanhel);
+            OutputStream outputStream = Channels.newOutputStream(_serverSocketChanhel);
             try {
                 _objectOutputStream = new ObjectOutputStream(outputStream);
 
@@ -191,6 +190,21 @@ public class NetworkServerClientHandler implements Runnable {
         });
         outcomeQueueThread.setName("outcomeServerEventsQueue");
         outcomeQueueThread.start();
+
+    }
+
+    private void initTransitionEventSender() {
+        Thread transitionEventSenderThread = new Thread(() -> {
+            while (true) {
+                PublisherEvent outcomeTransitionEvent = Publisher.getInstance().getTransitionEvent();
+                outcomeTransitionEvent.setServerCommand(Facade.CMD_SERVER_TRANSITION_EVENT);
+                sendEventToClient(outcomeTransitionEvent);
+                System.out.println("outcomeTransitionEvent send");
+
+            }
+        });
+        transitionEventSenderThread.setName("transitionEventSenderThread");
+        transitionEventSenderThread.start();
 
     }
 

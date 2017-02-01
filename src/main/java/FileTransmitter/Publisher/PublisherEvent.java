@@ -7,30 +7,33 @@ import java.io.Serializable;
 
 public class PublisherEvent implements IPublisherEvent, Serializable {
 
-    private String _name, _type, _groupName, _className;
+    private String _name, _type, _serverCommand, _listenerRegName;
     private Object _body;
     private Object[] _args;
 
     private static final Object[] NULL_ARRAY = new Object[0];
 
 
-    public PublisherEvent(String name, Object body, Object[] args) {
-        _name = name;
-        _body = body;
-        _args = (args == null) ? NULL_ARRAY : args;
-        _type = Facade.EVENT_TYPE_GENERIC;
-        _groupName = null;
-        _className = null;
+    public PublisherEvent() {
+        this(null);
+    }
+    public PublisherEvent(String name) {
+        this(name, null);
     }
     public PublisherEvent(String name, Object body) {
         this(name, body, NULL_ARRAY);
     }
-    public PublisherEvent(String name) {
-        this(name, null, NULL_ARRAY);
+    public PublisherEvent(String name, Object body, Object ...args) {
+        _name = name;
+        _body = body;
+        _args = (args == null) ? NULL_ARRAY : args;
+        _type = name != null ? Facade.EVENT_TYPE_SUBSCRIBE : Facade.EVENT_TYPE_GROUP;
+        _serverCommand = null;
+        _listenerRegName = null;
     }
 
     public String getName() {
-        return (_name != null) ? _name : "";
+        return _name;
     }
     public void setName(String name) {
         _name = name;
@@ -49,7 +52,7 @@ public class PublisherEvent implements IPublisherEvent, Serializable {
     public void setArgs(Object ...args) {
         _args = args;
     }
-    public int numArgs() {
+    public int getNumArgs() {
         return _args.length;
     }
 
@@ -60,22 +63,33 @@ public class PublisherEvent implements IPublisherEvent, Serializable {
         _type = type;
     }
 
-    public String getGroupName() {
-        return _groupName;
+    public String getServerCommand() {
+        return _serverCommand;
     }
-    public void setGroupName(String groupName) {
-        _groupName = groupName;
+    public void setServerCommand(String serverCommand) {
+        _serverCommand = serverCommand;
     }
-    public String getClassName() {
-        return _className;
+
+    public String getListenerRegName() {
+        return _listenerRegName;
     }
-    public void setClassName(String className) {
-        _className = className;
+    public void setListenerRegName(String listenerRegName) {
+        _listenerRegName = listenerRegName;
     }
 
     public PublisherEvent toServerCommand() {
         setType(Facade.EVENT_TYPE_SERVERGROUP_CMD);
-        setGroupName(_name);
+        setServerCommand(_name);
+        return this;
+    }
+
+    public PublisherEvent toGenericEvent() {
+        setServerCommand(null);
+        return this;
+    }
+
+    public PublisherEvent addServerCommand(String serverCommand) {
+        setServerCommand(serverCommand);
         return this;
     }
 }
