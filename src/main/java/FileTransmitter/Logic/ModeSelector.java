@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.*;
 
 public class ModeSelector {
@@ -31,30 +32,38 @@ public class ModeSelector {
 
     public void start() {
 
-        System.out.println("    You choice: \n" +
-                            "1. Start CLIENT role\n" +
-                            "2. Start SERVER role\n" +
-                            "3. Terminate the program\n");
-        BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
-        String choice = "";
-        try {
-            choice = stdin.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        boolean isSelected = false;
 
-        switch (choice) {
-            case "1": {
-                startClientRole();
-                break;
+        while (!isSelected) {
+            messageLog(    "   You choice: \n" +
+                           "1. Start CLIENT role\n" +
+                           "2. Start SERVER role\n" +
+                           "3. Terminate the program\n");
+            BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
+            String choice = "";
+            try {
+                choice = stdin.readLine();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            case "2": {
-                startServerRole();
-                break;
+
+            switch (choice) {
+                case "1": {
+                    isSelected = true;
+                    startClientRole();
+                    break;
+                }
+                case "2": {
+                    isSelected = true;
+                    startServerRole();
+                    break;
+                }
+                case "3": {
+                }
+
+                ServerStarter.stopAndExit(0);
             }
-            case "3": {
-            }
-            ServerStarter.stopAndExit(0);
+
         }
 
 //        Thread directoryWatcherThread = new Thread(new DirectoryWatcherThread());
@@ -67,8 +76,7 @@ public class ModeSelector {
     }
 
     private void startClientRole() {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                "StartClientRole");
+        messageLog("StartClientRole");
 
         _isServerRole = false;
         prepareWorkFolders();
@@ -81,8 +89,8 @@ public class ModeSelector {
     }
 
     private void startServerRole() {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
-                "StartServerRole");
+        messageLog("StartServerRole");
+
         _isServerRole = true;
         prepareWorkFolders();
 
@@ -195,6 +203,10 @@ public class ModeSelector {
 //        }
 //
 //    }
+
+    private void messageLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
+    }
 
 }
 

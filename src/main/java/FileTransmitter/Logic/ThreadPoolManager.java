@@ -41,10 +41,12 @@ public final class ThreadPoolManager implements IListener {
         }
 
         registerOnPublisher();
+
+        int workersThreadsNumber = 4;
         _threadsNumber = threadsNumber;
         _queue = new ConcurrentLinkedQueue<>();
-        _threads = new PoolWorker[threadsNumber];
-//        for (int i=0; i<threadsNumber; i++) {
+//        _threads = new PoolWorker[workersThreadsNumber];
+//        for (int i=0; i<workersThreadsNumber; i++) {
 //            _threads[i] = new PoolWorker();
 //            _threads[i].start();
 //        }
@@ -103,6 +105,12 @@ public final class ThreadPoolManager implements IListener {
     }
 
 
+//    public void addRunnableTask(Runnable task) {
+//        _executorService.execute(task);
+//    }
+//    public void shutdownRunnableTasks() {
+//        _executorService.shutdownNow();
+//    }
 
     public void execute(Runnable task) {
         synchronized(_queue) {
@@ -209,7 +217,8 @@ public final class ThreadPoolManager implements IListener {
     public String[] listenerInterests() {
         return new String[] {
                 Facade.CMD_EXECUTOR_PUT_TASK,
-                Facade.CMD_EXECUTOR_TAKE_TASK
+                Facade.CMD_EXECUTOR_TAKE_TASK,
+                Facade.CMD_EXECUTOR_DEMO
         };
     }
 
@@ -222,17 +231,25 @@ public final class ThreadPoolManager implements IListener {
 
         switch (publisherEvent.getName()) {
             case Facade.CMD_EXECUTOR_PUT_TASK: {
-                messageLog("[EXECUTOR] command received on CMD_EXECUTOR_PUT_TASK, body: "
-                        + publisherEvent.getBody() + "\nEXECUTOR: sendTransitionEvent to "
-                        + "remote LOGGER_ADD_LOG, contains THIS MESSAGE");
 
-                PublisherEvent outcomeEvent = new PublisherEvent(Facade.CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
-                Publisher.getInstance().sendTransitionEvent(outcomeEvent);
+                PublisherEvent transitionEvent = new PublisherEvent(Facade.CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
+                Publisher.getInstance().sendTransitionEvent(transitionEvent);
                 break;
             }
 
             case Facade.CMD_EXECUTOR_TAKE_TASK: {
                 messageLog("EXECUTOR_TAKE_TASK" + publisherEvent.getBody());
+                break;
+            }
+
+            case Facade.CMD_EXECUTOR_DEMO: {
+                messageLog("[EXECUTOR] command received on CMD_EXECUTOR_DEMO, body: "
+                        + publisherEvent.getBody() + "\nEXECUTOR: sendTransitionEvent to "
+                        + "remote LOGGER_ADD_LOG, contains THIS MESSAGE");
+                //work......
+
+                PublisherEvent transitionEvent = new PublisherEvent(Facade.CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
+                Publisher.getInstance().sendTransitionEvent(transitionEvent);
                 break;
             }
 

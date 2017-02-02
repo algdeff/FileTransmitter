@@ -81,7 +81,7 @@ public final class Publisher {
 
         return success;
     }
-    public boolean removeListaner(String listenerRegName) {
+    public boolean removeListener(String listenerRegName) {
         if (!_registeredListeners.containsKey(listenerRegName)) {
             return false;
         }
@@ -180,6 +180,14 @@ public final class Publisher {
 //        return false;
     }
 
+    public void sendTransitionEvent(String eventName) {
+        PublisherEvent transitionEvent = new PublisherEvent(eventName, null);
+        sendTransitionEvent(transitionEvent);
+    }
+    public void sendTransitionEvent(String eventName, Object body) {
+        PublisherEvent transitionEvent = new PublisherEvent(eventName, body);
+        sendTransitionEvent(transitionEvent);
+    }
     public void sendTransitionEvent(PublisherEvent publisherEvent) {
         try {
             _transitionEventsQueue.put(publisherEvent);
@@ -192,7 +200,7 @@ public final class Publisher {
         try {
             publisherEvent = _transitionEventsQueue.take();
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            System.err.println("PUBLISHER: Transition event interrupted!");
         }
         return publisherEvent;
 

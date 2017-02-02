@@ -12,6 +12,8 @@ public final class Facade {
                                      EVENT_GROUP_ALL  =  "event_group_all",
                                   EVENT_GROUP_LOGGER  =  "logger_group_event",
                                       EVENT_GROUP_DB  =  "database_manager_group_event",
+                           EVENT_GROUP_TASK_EXECUTOR  =  "event_group_task_executor",
+                           EVENT_GROUP_TASK_PRODUCER  =  "event_group_task_producer",
                                 EVENT_GROUP_EXECUTOR  =  "event_group_executor",
                               EVENT_GROUP_NET_SERVER  =  "event_group_net_server",
                               EVENT_GROUP_NET_CLIENT  =  "event_group_net_client",
@@ -21,13 +23,25 @@ public final class Facade {
 
                                CMD_EXECUTOR_PUT_TASK  =  "cmd_executor_put_task",
                               CMD_EXECUTOR_TAKE_TASK  =  "cmd_executor_take_task",
+                                   CMD_EXECUTOR_DEMO  =  "cmd_executor_demo",
+
+                             CMD_NET_CLIENT_UI_BREAK  =  "cmd_net_server_ui_break",
+                             CMD_NET_CLIENT_SHUTDOWN  =  "cmd_net_server_shutdown",
 
                                   CMD_LOGGER_ADD_LOG  =  "cmd_logger_add_log",
                                CMD_LOGGER_ADD_RECORD  =  "cmd_logger_add_record",
                                 CMD_LOGGER_CLEAR_LOG  =  "cmd_logger_clear_log",
 
+                             CMD_TASK_EXECUTOR_START  =  "cmd_task_executor_start",
+                      CMD_TASK_EXECUTOR_ADD_NEW_TASK  =  "cmd_task_executor_add_new_task",
+
+                             CMD_TASK_PRODUCER_START  =  "cmd_task_producer_start",
+             CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK  =  "cmd_task_producer_collect_complete_task",
+                      CMD_TASK_PRODUCER_GET_NEW_TASK  =  "cmd_task_producer_get_new_task",
+
 //           CMD_SERVER_INTERNAL_SEND_TRANSITION_EVENT  =  "cmd_server_internal_send_transition_event",
 
+                            CMD_SERVER_SET_CLIENT_ID  =  "cmd_server_set_client_id",
                            CMD_SERVER_GET_FILES_LIST  =  "cmd_server_get_files_list",
                                 CMD_SERVER_GET_FILES  =  "cmd_server_get_files",
                                 CMD_SERVER_ADD_FILES  =  "cmd_server_add_files",

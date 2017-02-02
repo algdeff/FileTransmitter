@@ -24,16 +24,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
-public class FileClient {
+public class FileClient implements IListener {
 
     private Path _receivedPath;
     private Path _outcomingPath;
     private Path _sentPath;
 
+    private String _clientID = null;
+
+    private boolean uiActive = true;
+
+    private ThreadGroup _clientWorkersThreads;
+
     private String _remoteServerUrl;
     private int _remoteServerPort;
 
-    private BlockingQueue<PublisherEvent> _outcomeClientEventsQueue;
+    private BlockingQueue<PublisherEvent> _outcomeEventsToServerQueue;
 
     private AsynchronousSocketChannel _clientSocketChannel;
     private ObjectOutputStream _objectOutputStream;
@@ -48,13 +54,14 @@ public class FileClient {
         _receivedPath = ConfigManager.getReceivedPath();
         _outcomingPath = ConfigManager.getOutcomingPath();
         _sentPath = ConfigManager.getSentPath();
-        _outcomeClientEventsQueue = new LinkedBlockingQueue<>(50);
+        _outcomeEventsToServerQueue = new LinkedBlockingQueue<>(50);
         _serverFileListCache = new ArrayList<>();
         _clientFileListCache = new ArrayList<>();
         _clientSocketChannel = null;
     }
 
     public void start() {
+        registerOnPublisher();
         openConnectionToServer();
 
     }
@@ -86,7 +93,9 @@ public class FileClient {
             }
             messageLog("Connected to server " + hostAddress);
 
-            outcomeClientEventsQueueInit();
+            initOutcomeEventsToServerQueue();
+            initTransitionEventSender();
+
             InputStream inputStream = Channels.newInputStream(_clientSocketChannel);
             _objectInputStream = new ObjectInputStream(inputStream);
 
@@ -110,7 +119,7 @@ public class FileClient {
                       "2. Receive file from server\n" +
                       "3. List server files\n" +
                       "4. List client files to send\n" +
-                      "5. Send task to executor\n" +
+                      "5. Run task factory\n" +
                       "6. Transition event demo\n" +
                       "7. Terminate the program\n");
     }
@@ -123,7 +132,7 @@ public class FileClient {
         }
 
         private void clientCommandListener() {
-            while (true) {
+            while (uiActive) {
                 printMenu();
 
                 BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
@@ -152,7 +161,7 @@ public class FileClient {
                         break;
                     }
                     case "5": {
-                        sendTaskToExecutor();
+                        runTaskFactory();
                         break;
                     }
                     case "6": {
@@ -165,6 +174,7 @@ public class FileClient {
                 }
 
             }
+            messageLog("/Client UI terminate/");
 
         }
 
@@ -246,20 +256,17 @@ public class FileClient {
             }
         }
 
-        private void sendTaskToExecutor() {
-
-            System.out.println("TASK SENDED To EXECUTOR");
+        private void runTaskFactory() {
+            Publisher.getInstance().sendPublisherEvent(Facade.CMD_TASK_EXECUTOR_START, getClientID());
 
         }
 
         private void transitionEventDemo() {
             messageLog("[Transition event demo...]");
-            PublisherEvent publisherEvent = new PublisherEvent(Facade.CMD_EXECUTOR_PUT_TASK,
-                    "CLIENT: THIS OUTCOME MESSAGE send to EXECUTOR_PUT_TASK")
+            PublisherEvent publisherEvent = new PublisherEvent(Facade.CMD_EXECUTOR_DEMO,
+                    "CLIENT: THIS OUTCOME MESSAGE send to CMD_EXECUTOR_DEMO")
                     .addServerCommand(Facade.CMD_SERVER_TRANSITION_EVENT);
-//            PublisherEvent publisherEvent = new PublisherEvent(Facade.EVENT_GROUP_EXECUTOR,
-//                    "HELOO FROM CLIENT").addServerCommand(Facade.CMD_SERVER_ADD_FUTURE_TASK);
-//            publisherEvent.setType(Facade.EVENT_TYPE_GROUP);
+
             sendEventToServer(publisherEvent);
         }
 
@@ -284,13 +291,13 @@ public class FileClient {
             return fileList;
         }
 
-        private void sendEventToServer(PublisherEvent publisherEvent) {  //synchronyzed if no queue
-            try {
-                _outcomeClientEventsQueue.put(publisherEvent);
-            } catch (InterruptedException e) {
-                toLog(e.getMessage());
-            }
+    }
 
+    private void sendEventToServer(PublisherEvent publisherEvent) {  //synchronyzed if no queue
+        try {
+            _outcomeEventsToServerQueue.put(publisherEvent);
+        } catch (InterruptedException e) {
+            toLog(e.getMessage());
         }
 
     }
@@ -343,6 +350,12 @@ public class FileClient {
         private void parseCommandFromServer(PublisherEvent eventFromServer) {
 
             switch (eventFromServer.getServerCommand()) {
+                case Facade.CMD_SERVER_SET_CLIENT_ID: {
+                    setClientID((String) eventFromServer.getBody());
+                    toLog(getClientID());
+                    return;
+                }
+
                 case Facade.CMD_SERVER_ADD_FILES: {
 
 //                    System.err.println("Command: " + command);
@@ -361,7 +374,7 @@ public class FileClient {
                     return;
                 }
                 case Facade.CMD_SERVER_TRANSITION_EVENT: {
-                    publishTransitionEvent(eventFromServer);
+                    publishTransitionEventFromServer(eventFromServer);
                     return;
                 }
 
@@ -370,7 +383,7 @@ public class FileClient {
 
         }
 
-        private void publishTransitionEvent(PublisherEvent eventFromServer) {
+        private void publishTransitionEventFromServer(PublisherEvent eventFromServer) {
             Publisher.getInstance().sendPublisherEvent(eventFromServer.toGenericEvent());
         }
 
@@ -402,15 +415,15 @@ public class FileClient {
 
     }
 
-    private void outcomeClientEventsQueueInit() {
+    private void initOutcomeEventsToServerQueue() {
 
-        Thread outcomeQueueThread = new Thread(() -> {
+        Thread outcomeQueueThread = new Thread(_clientWorkersThreads, () -> {
             OutputStream outputStream = Channels.newOutputStream(_clientSocketChannel);
             try {
                 _objectOutputStream = new ObjectOutputStream(outputStream);
 
                 while (true) {
-                    PublisherEvent publisherEvent = _outcomeClientEventsQueue.take();
+                    PublisherEvent publisherEvent = _outcomeEventsToServerQueue.take();
                     _objectOutputStream.writeObject(publisherEvent);
                 }
 
@@ -418,10 +431,67 @@ public class FileClient {
                 messageLog("Output stream break!");
             }
 
-        });
-        outcomeQueueThread.setName("outcomeServerEventsQueue");
+        }, "outcomeEventsToServerQueue");
         outcomeQueueThread.start();
 
+    }
+
+    private void initTransitionEventSender() {
+        Thread transitionEventSenderThread = new Thread(_clientWorkersThreads, () -> {
+            while (true) {
+                PublisherEvent outcomeTransitionEvent = Publisher.getInstance().getTransitionEvent();
+                outcomeTransitionEvent.setServerCommand(Facade.CMD_SERVER_TRANSITION_EVENT);
+                sendEventToServer(outcomeTransitionEvent);
+                System.out.println("outcomeTransitionEvent send");
+
+            }
+        }, "transitionEventSenderThread");
+        transitionEventSenderThread.start();
+
+    }
+
+    @Override
+    public void registerOnPublisher() {
+        Publisher.getInstance().registerNewListener(this, Facade.EVENT_GROUP_NET_CLIENT);
+    }
+
+    @Override
+    public String[] listenerInterests() {
+        return new String[] {
+                Facade.CMD_NET_CLIENT_UI_BREAK,
+                Facade.CMD_NET_CLIENT_SHUTDOWN
+        };
+    }
+
+    @Override
+    public void listenerHandler(IPublisherEvent publisherEvent) {
+        if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
+            messageLog("NetClient received group event ("
+                    + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
+        }
+
+        switch (publisherEvent.getName()) {
+            case Facade.CMD_NET_CLIENT_UI_BREAK: {
+                messageLog("CMD_NET_CLIENT_UI_BREAK " + publisherEvent.getBody());
+                uiActive = false;
+                break;
+            }
+
+            case Facade.CMD_NET_CLIENT_SHUTDOWN: {
+                messageLog("CMD_NET_CLIENT_SHUTDOWN " + publisherEvent.getBody());
+                break;
+            }
+
+        }
+
+    }
+
+    private void setClientID(String clientID) {
+        if (_clientID != null) return;
+        _clientID = clientID;
+    }
+    private String getClientID() {
+        return _clientID;
     }
 
     private void messageLog(String message) {

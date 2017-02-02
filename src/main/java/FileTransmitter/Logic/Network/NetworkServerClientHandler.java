@@ -8,11 +8,15 @@ import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.Publisher.PublisherEvent;
 import FileTransmitter.ServerStarter;
+import com.sun.jmx.snmp.ThreadContext;
+import com.sun.jmx.snmp.tasks.ThreadService;
+import sun.misc.ThreadGroupUtils;
 
 import java.io.*;
 import java.net.SocketAddress;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.Channels;
+import java.nio.channels.ClosedChannelException;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,18 +28,41 @@ public class NetworkServerClientHandler implements Runnable {
     private Path _outcomingPath;
     private Path _sentPath;
 
-    private BlockingQueue<PublisherEvent> _outcomeServerEventsQueue;
+    private String _clientID;
+
+    private boolean _sessionActive = true;
+
+    private ThreadGroup _clientHandlerThreads;
+
+    private BlockingQueue<PublisherEvent> _outcomeEventsToClientQueue;
 
     private AsynchronousSocketChannel _serverSocketChanhel;
     private ObjectInputStream _objectInputStream;
     private ObjectOutputStream _objectOutputStream;
 
-    public NetworkServerClientHandler(AsynchronousSocketChannel socketChanhel) {
+    public NetworkServerClientHandler(AsynchronousSocketChannel socketChanhel, String clientID) {
+        _clientID = clientID;
         _serverSocketChanhel = socketChanhel;
         _receivedPath = ConfigManager.getReceivedPath();
         _outcomingPath = ConfigManager.getOutcomingPath();
         _sentPath = ConfigManager.getSentPath();
-        _outcomeServerEventsQueue = new LinkedBlockingQueue<>(50);
+        _clientHandlerThreads = new ThreadGroup("clientHandlerThreads");
+        _outcomeEventsToClientQueue = new LinkedBlockingQueue<>(50);
+    }
+
+    private void clientShutdown() {
+        _sessionActive = false;
+        try {
+            _objectOutputStream.flush();
+//            _objectOutputStream.close();
+            _serverSocketChanhel.shutdownOutput();
+            _serverSocketChanhel.shutdownInput();
+            _serverSocketChanhel.close();
+        } catch (IOException e) {
+            messageLog("CLIENT SHUTDOWN...");
+        }
+        _clientHandlerThreads.interrupt();
+//            ThreadPoolManager.getInstance().shutdownRunnableTasks();
     }
 
     @Override
@@ -48,14 +75,16 @@ public class NetworkServerClientHandler implements Runnable {
         try {
             clientAddress = _serverSocketChanhel.getRemoteAddress();
             if (_serverSocketChanhel.isOpen()) {
-                messageLog("New client connected: " + clientAddress);
+                messageLog("New client (" + _clientID + ") connected: " + clientAddress);
 
                 InputStream inputStream = Channels.newInputStream(_serverSocketChanhel);
                 _objectInputStream = new ObjectInputStream(inputStream);
-                initOutcomeServerEventsQueue();
+                initOutcomeEventsToClientQueue();
                 initTransitionEventSender();
 
-                while (true) {
+                sendEventToClient(new PublisherEvent(Facade.CMD_SERVER_SET_CLIENT_ID, _clientID).toServerCommand());
+
+                while (_sessionActive) {
                     Object receivedObject = _objectInputStream.readObject();
 
                     if (!receivedObject.getClass().getName().equals(PublisherEvent.class.getName())) {
@@ -84,6 +113,7 @@ public class NetworkServerClientHandler implements Runnable {
         } catch (ClassNotFoundException e) {
             toLog(e.getMessage());
         } catch (IOException e) {
+            clientShutdown();
             messageLog("Client ("+ clientAddress +") is breakdown!");
         }
 
@@ -109,7 +139,7 @@ public class NetworkServerClientHandler implements Runnable {
                 return;
             }
             case Facade.CMD_SERVER_TRANSITION_EVENT: {
-                publishTransitionEvent(eventFromClient);
+                publishTransitionEventFromClient(eventFromClient);
                 return;
             }
 
@@ -118,8 +148,18 @@ public class NetworkServerClientHandler implements Runnable {
 
     }
 
-    private void publishTransitionEvent(PublisherEvent eventFromClient) {
+    private void publishTransitionEventFromClient(PublisherEvent eventFromClient) {
         Publisher.getInstance().sendPublisherEvent(eventFromClient.toGenericEvent());
+
+    }
+
+    private void sendEventToClient(PublisherEvent publisherEvent) {  //synchronyzed if no queue
+        try {
+            _outcomeEventsToClientQueue.put(publisherEvent);
+        } catch (InterruptedException e) {
+            toLog(e.getMessage());
+        }
+
     }
 
     private void saveClientFileToReceivedFolder(PublisherEvent eventFromClient) {
@@ -164,47 +204,47 @@ public class NetworkServerClientHandler implements Runnable {
 
     }
 
-    private void sendEventToClient(PublisherEvent publisherEvent) {  //synchronyzed if no queue
-        try {
-            _outcomeServerEventsQueue.put(publisherEvent);
-        } catch (InterruptedException e) {
-            toLog(e.getMessage());
-        }
-    }
 
-    private void initOutcomeServerEventsQueue() {
-        Thread outcomeQueueThread = new Thread(() -> {
+
+
+    private void initOutcomeEventsToClientQueue() {
+        Thread outcomeQueueThread = new Thread(_clientHandlerThreads, () -> {
             OutputStream outputStream = Channels.newOutputStream(_serverSocketChanhel);
             try {
                 _objectOutputStream = new ObjectOutputStream(outputStream);
 
-                while (true) {
-                    PublisherEvent publisherEvent = _outcomeServerEventsQueue.take();
+                while (_sessionActive) {
+                    PublisherEvent publisherEvent = _outcomeEventsToClientQueue.take();
                     _objectOutputStream.writeObject(publisherEvent);
                 }
 
             } catch (InterruptedException | IOException e) {
                 messageLog("Output stream break!");
+                clientShutdown();
             }
 
-        });
-        outcomeQueueThread.setName("outcomeServerEventsQueue");
+        }, "outcomeEventsToClientQueue");
         outcomeQueueThread.start();
+//        ThreadPoolManager.getInstance().addRunnableTask(_outcomeQueueThread);
 
     }
 
     private void initTransitionEventSender() {
-        Thread transitionEventSenderThread = new Thread(() -> {
-            while (true) {
-                PublisherEvent outcomeTransitionEvent = Publisher.getInstance().getTransitionEvent();
-                outcomeTransitionEvent.setServerCommand(Facade.CMD_SERVER_TRANSITION_EVENT);
-                sendEventToClient(outcomeTransitionEvent);
-                System.out.println("outcomeTransitionEvent send");
+        Thread senderThread = new Thread(_clientHandlerThreads, () -> {
+            try {
+                while (_sessionActive) {
+                    PublisherEvent outcomeTransitionEvent = Publisher.getInstance().getTransitionEvent();
+                    outcomeTransitionEvent.setServerCommand(Facade.CMD_SERVER_TRANSITION_EVENT);
+                    sendEventToClient(outcomeTransitionEvent);
+                    System.out.println("outcomeTransitionEvent send");
 
+                }
+            } catch (Exception e) {
+                messageLog("TE break!");
             }
-        });
-        transitionEventSenderThread.setName("transitionEventSenderThread");
-        transitionEventSenderThread.start();
+        }, "initTransitionEventSenderThread");
+        senderThread.start();
+//        ThreadPoolManager.getInstance().addRunnableTask(_transitionEventSenderThread);
 
     }
 

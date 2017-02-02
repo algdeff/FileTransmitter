@@ -1,8 +1,6 @@
 package FileTransmitter;
 
-import FileTransmitter.Logic.ConfigManager;
-import FileTransmitter.Logic.ModeSelector;
-import FileTransmitter.Logic.ThreadPoolManager;
+import FileTransmitter.Logic.*;
 import FileTransmitter.Logic.Workers.LogFileWorker;
 import FileTransmitter.Publisher.Publisher;
 
@@ -48,8 +46,14 @@ public class ServerStarter {
         ThreadPoolManager.getInstance()
                 .init(ConfigManager.getThreadPoolSize());
 
+        ServerTaskProducer serverTaskProducer = new ServerTaskProducer();
+        serverTaskProducer.init();
+
         ModeSelector modeSelector = new ModeSelector();
         modeSelector.start();
+
+        ClientTaskExecutor clientTaskExecutor = new ClientTaskExecutor();
+        clientTaskExecutor.init();
 
     }
 
