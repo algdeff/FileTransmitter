@@ -47,7 +47,7 @@ public class ServerTaskProducer implements IListener {
     private void delayedStart() {
         messageLog("[ServerTaskProducer] START");
 
-        Publisher.getInstance().sendTransitionEvent(Facade.EVENT_GROUP_TASK_EXECUTOR, NAME);
+//        Publisher.getInstance().sendTransitionEvent(Facade.EVENT_GROUP_TASK_EXECUTOR, NAME);
 
         //PublisherEvent transitionEvent = new PublisherEvent(Facade.CMD_EXECUTOR_PUT_TASK, "From ClientTaskExecutor");
         //Publisher.getInstance().sendTransitionEvent(transitionEvent);
@@ -117,10 +117,10 @@ public class ServerTaskProducer implements IListener {
 //                + " / " + publisherEvent.getType() + ":\n" + publisherEvent.getBody().toString());
         if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
             messageLog("TASK_FACTORY - received group event ("
-                    + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
+                    + publisherEvent.getInterestName() + "): \n" + publisherEvent.getBody().toString());
         }
 
-        switch (publisherEvent.getName()) {
+        switch (publisherEvent.getInterestName()) {
             case Facade.CMD_TASK_PRODUCER_START: {
                 delayedStart();
                 break;

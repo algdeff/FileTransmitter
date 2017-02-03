@@ -112,12 +112,11 @@ public class ClientTaskExecutor implements IListener {
     public void listenerHandler(IPublisherEvent publisherEvent) {
         if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
             messageLog("TASK_EXECUTOR - received group event ("
-                    + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
-
+                    + publisherEvent.getInterestName() + "): \n" + publisherEvent.getBody().toString());
             return;
         }
 
-        switch (publisherEvent.getName()) {
+        switch (publisherEvent.getInterestName()) {
             case Facade.CMD_TASK_EXECUTOR_START: {
                 delayedStart((String) publisherEvent.getBody());
                 break;

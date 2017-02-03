@@ -61,7 +61,6 @@ public class FileClient implements IListener {
     }
 
     public void start() {
-        registerOnPublisher();
         openConnectionToServer();
 
     }
@@ -94,7 +93,8 @@ public class FileClient implements IListener {
             messageLog("Connected to server " + hostAddress);
 
             initOutcomeEventsToServerQueue();
-            initTransitionEventSender();
+//            initTransitionEventSender();
+            registerOnPublisher();
 
             InputStream inputStream = Channels.newInputStream(_clientSocketChannel);
             _objectInputStream = new ObjectInputStream(inputStream);
@@ -207,7 +207,7 @@ public class FileClient implements IListener {
 
 //            System.out.println(fileToSend.toString() + " " + fileSize);
 
-            PublisherEvent eventToServer = new PublisherEvent(Facade.CMD_SERVER_ADD_FILES, fileContent).toServerCommand();
+            PublisherEvent eventToServer = new PublisherEvent(Facade.SERVER_ADD_FILES, fileContent).toServerCommand();
             eventToServer.setArgs(fileToSend.getFileName().toString(), fileSize);
 //            System.out.println(eventToServer.getName());
             sendEventToServer(eventToServer);
@@ -233,16 +233,15 @@ public class FileClient implements IListener {
             }
             int selectedIndex = Integer.parseInt(choice);
 
-            PublisherEvent eventToServer = new PublisherEvent(Facade.CMD_SERVER_GET_FILES,
+            PublisherEvent eventToServer = new PublisherEvent(Facade.SERVER_GET_FILES,
                     _serverFileListCache.get(selectedIndex)).toServerCommand();
-            System.out.println(eventToServer.getName());
             sendEventToServer(eventToServer);
 
         }
 
         private void listServerFiles() {
             messageLog("[ListServerFiles]");
-            PublisherEvent eventToServer = new PublisherEvent(Facade.CMD_SERVER_GET_FILES_LIST).toServerCommand();
+            PublisherEvent eventToServer = new PublisherEvent(Facade.SERVER_GET_FILES_LIST).toServerCommand();
             sendEventToServer(eventToServer);
 
         }
@@ -265,7 +264,7 @@ public class FileClient implements IListener {
             messageLog("[Transition event demo...]");
             PublisherEvent publisherEvent = new PublisherEvent(Facade.CMD_EXECUTOR_DEMO,
                     "CLIENT: THIS OUTCOME MESSAGE send to CMD_EXECUTOR_DEMO")
-                    .addServerCommand(Facade.CMD_SERVER_TRANSITION_EVENT);
+                    .addServerCommand(Facade.SERVER_TRANSITION_EVENT);
 
             sendEventToServer(publisherEvent);
         }
@@ -324,11 +323,11 @@ public class FileClient implements IListener {
                     PublisherEvent eventFromServer = (PublisherEvent) receivedObject;
 
                     if (eventFromServer.getServerCommand() == null) {
-                        messageLog("No server command found in event: " + eventFromServer.getName());
+                        messageLog("No server command found in event: " + eventFromServer.getInterestName());
                         continue;
                     }
 
-                    if (eventFromServer.getServerCommand().equals(Facade.CMD_SERVER_TERMINATE)) {
+                    if (eventFromServer.getServerCommand().equals(Facade.SERVER_TERMINATE)) {
                         messageLog("CMD_SERVER_TERMINATE");
                         //clientSocket.close();
                         break;
@@ -350,30 +349,30 @@ public class FileClient implements IListener {
         private void parseCommandFromServer(PublisherEvent eventFromServer) {
 
             switch (eventFromServer.getServerCommand()) {
-                case Facade.CMD_SERVER_SET_CLIENT_ID: {
+                case Facade.SERVER_SET_CLIENT_ID: {
                     setClientID((String) eventFromServer.getBody());
                     toLog(getClientID());
                     return;
                 }
 
-                case Facade.CMD_SERVER_ADD_FILES: {
+                case Facade.SERVER_ADD_FILES: {
 
 //                    System.err.println("Command: " + command);
                     return;
                 }
-                case Facade.CMD_SERVER_GET_FILES: {
+                case Facade.SERVER_GET_FILES: {
 //                    System.err.println("Command: " + command);
                     saveServerFileToReceivedFolder(eventFromServer);
                     return;
                 }
-                case Facade.CMD_SERVER_GET_FILES_LIST: {
+                case Facade.SERVER_GET_FILES_LIST: {
 //                    System.err.println("Command: " + command);
                     _serverFileListCache.clear();
                     _serverFileListCache.addAll((List<String>) eventFromServer.getBody());
                     printListFilesFromServer();
                     return;
                 }
-                case Facade.CMD_SERVER_TRANSITION_EVENT: {
+                case Facade.SERVER_TRANSITION_EVENT: {
                     publishTransitionEventFromServer(eventFromServer);
                     return;
                 }
@@ -384,7 +383,7 @@ public class FileClient implements IListener {
         }
 
         private void publishTransitionEventFromServer(PublisherEvent eventFromServer) {
-            Publisher.getInstance().sendPublisherEvent(eventFromServer.toGenericEvent());
+            Publisher.getInstance().sendPublisherEvent(eventFromServer);
         }
 
         private void saveServerFileToReceivedFolder(PublisherEvent eventFromServer) {
@@ -436,23 +435,23 @@ public class FileClient implements IListener {
 
     }
 
-    private void initTransitionEventSender() {
-        Thread transitionEventSenderThread = new Thread(_clientWorkersThreads, () -> {
-            while (true) {
-                PublisherEvent outcomeTransitionEvent = Publisher.getInstance().getTransitionEvent();
-                outcomeTransitionEvent.setServerCommand(Facade.CMD_SERVER_TRANSITION_EVENT);
-                sendEventToServer(outcomeTransitionEvent);
-                System.out.println("outcomeTransitionEvent send");
-
-            }
-        }, "transitionEventSenderThread");
-        transitionEventSenderThread.start();
-
-    }
+//    private void initTransitionEventSender() {
+//        Thread transitionEventSenderThread = new Thread(_clientWorkersThreads, () -> {
+//            while (true) {
+//                PublisherEvent outcomeTransitionEvent = Publisher.getInstance().getTransitionEvent();
+//                outcomeTransitionEvent.setServerCommand(Facade.SERVER_TRANSITION_EVENT);
+//                sendEventToServer(outcomeTransitionEvent);
+//                System.out.println("outcomeTransitionEvent send");
+//
+//            }
+//        }, "transitionEventSenderThread");
+//        transitionEventSenderThread.start();
+//
+//    }
 
     @Override
     public void registerOnPublisher() {
-        Publisher.getInstance().registerNewListener(this, Facade.EVENT_GROUP_NET_CLIENT);
+        Publisher.getInstance().registerNewListener(this, Facade.TRANSITION_EVENT_GROUP_CLIENT);
     }
 
     @Override
@@ -465,12 +464,17 @@ public class FileClient implements IListener {
 
     @Override
     public void listenerHandler(IPublisherEvent publisherEvent) {
+        if (publisherEvent.getServerCommand().equals(Facade.SERVER_TRANSITION_EVENT)) {
+            messageLog("Send transition event to Server, type is: " + publisherEvent.getGroupName());
+            sendEventToServer((PublisherEvent) publisherEvent);
+            return;
+        }
         if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
             messageLog("NetClient received group event ("
-                    + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
+                    + publisherEvent.getGroupName() + "): \n" + publisherEvent.getBody().toString());
         }
 
-        switch (publisherEvent.getName()) {
+        switch (publisherEvent.getInterestName()) {
             case Facade.CMD_NET_CLIENT_UI_BREAK: {
                 messageLog("CMD_NET_CLIENT_UI_BREAK " + publisherEvent.getBody());
                 uiActive = false;

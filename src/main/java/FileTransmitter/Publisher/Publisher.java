@@ -23,14 +23,16 @@ public final class Publisher {
      */
     private static ConcurrentMap<String, ListenerContext> _registeredListeners;
     private static ConcurrentMap<String, List<String>> _listenersEventMap;
+    private static ConcurrentMap<String, ListenerContext> _registeredRemoteUsers;
     private static volatile Publisher instance;
 
-    private static BlockingQueue<PublisherEvent> _transitionEventsQueue;
+//    private static BlockingQueue<PublisherEvent> _transitionEventsQueue;
 
     private Publisher() {
         _registeredListeners = new ConcurrentHashMap<>();
         _listenersEventMap = new ConcurrentHashMap<>();
-        _transitionEventsQueue = new LinkedBlockingQueue<>();
+        _registeredRemoteUsers = new ConcurrentHashMap<>();
+//        _transitionEventsQueue = new LinkedBlockingQueue<>();
 
     }
 
@@ -68,6 +70,23 @@ public final class Publisher {
 
         return true;
     }
+
+
+    public boolean registerRemoteClient(IListener remoteUserHandler, String User_ID) {
+        return registerRemoteClient(remoteUserHandler, User_ID, null);
+    }
+    public boolean registerRemoteClient(IListener remoteUserHandler, String User_ID, String userGroup) {
+        if (_registeredRemoteUsers.containsKey(User_ID)) {
+            return false;
+        }
+
+        ListenerContext context = new ListenerContext(remoteUserHandler, userGroup);
+        context.setListenerRegName(User_ID);
+        _registeredRemoteUsers.put(User_ID, context);
+        return true;
+    }
+
+
 
     public boolean removeListaner(IListener listener) {
         boolean success = false;
@@ -180,31 +199,63 @@ public final class Publisher {
 //        return false;
     }
 
-    public void sendTransitionEvent(String eventName) {
-        PublisherEvent transitionEvent = new PublisherEvent(eventName, null);
-        sendTransitionEvent(transitionEvent);
+
+
+//    public void sendTransitionEvent(String eventName) {
+//        PublisherEvent transitionEvent = new PublisherEvent(eventName, null);
+//        sendTransitionEvent(transitionEvent);
+//    }
+//    public void sendTransitionEvent(String eventName, Object body) {
+//        PublisherEvent transitionEvent = new PublisherEvent(eventName, body);
+//        sendTransitionEvent(transitionEvent);
+//    }
+
+    public void sendTransitionEvent(IPublisherEvent publisherEvent) {
+        sendTransitionEvent(publisherEvent, null, null);
     }
-    public void sendTransitionEvent(String eventName, Object body) {
-        PublisherEvent transitionEvent = new PublisherEvent(eventName, body);
-        sendTransitionEvent(transitionEvent);
+    public void sendTransitionEvent(IPublisherEvent publisherEvent, String ClientID) {
+        sendTransitionEvent(publisherEvent, ClientID, null);
     }
-    public void sendTransitionEvent(PublisherEvent publisherEvent) {
-        try {
-            _transitionEventsQueue.put(publisherEvent);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+    public void sendTransitionEvent(IPublisherEvent publisherEvent, String ClientID, String groupName) {
+        publisherEvent.setServerCommand(Facade.SERVER_TRANSITION_EVENT);
+        if (groupName != null) {
+            for (ListenerContext remoteClientsContext : _registeredRemoteUsers.values()) {
+                if (remoteClientsContext.getListenerGroupName().equals(groupName)) {
+                    System.out.println("SendTransitionEventToClientsGroup: " + groupName);
+                    remoteClientsContext.getListener().listenerHandler(publisherEvent);
+                }
+            }
+            return;
         }
-    }
-    public PublisherEvent getTransitionEvent() {
-        PublisherEvent publisherEvent = null;
-        try {
-            publisherEvent = _transitionEventsQueue.take();
-        } catch (InterruptedException e) {
-            System.err.println("PUBLISHER: Transition event interrupted!");
+        if (ClientID != null) {
+            for (ListenerContext remoteClientsContext : _registeredRemoteUsers.values()) {
+                if (remoteClientsContext.getListenerRegName().equals(ClientID)) {
+                    System.out.println("Send Transition Event to Clients Group: " + remoteClientsContext.getListenerRegName());
+                    remoteClientsContext.getListener().listenerHandler(publisherEvent);
+                }
+            }
+            return;
         }
-        return publisherEvent;
+        for (ListenerContext listenerContext : _registeredListeners.values()) {
+            if (listenerContext.getListenerGroupName().equals(Facade.TRANSITION_EVENT_GROUP_CLIENT)) {
+                System.out.println("Send Transition Event to server");
+                listenerContext.getListener().listenerHandler(publisherEvent);
+            }
+
+        }
 
     }
+
+//    public PublisherEvent getTransitionEvent() {
+//        PublisherEvent publisherEvent = null;
+//        try {
+//            publisherEvent = _transitionEventsQueue.take();
+//        } catch (InterruptedException e) {
+//            System.err.println("PUBLISHER: Transition event interrupted!");
+//        }
+//        return publisherEvent;
+//
+//    }
 
     private Object blankObject() {
         return new Object();
@@ -236,8 +287,8 @@ public final class Publisher {
                 sendEventToGroup(publisherEvent);
                 return;
             }
-            case Facade.EVENT_TYPE_SPECIFIC: {
-                sendEventToSpecificListenerName(publisherEvent);
+            case Facade.EVENT_TYPE_PRIVATE: {
+                sendEventToPrivateSubscriberName(publisherEvent);
                 return;
             }
             case Facade.EVENT_TYPE_BROADCAST: {
@@ -279,25 +330,23 @@ public final class Publisher {
 
         for (String listenerRegName : _registeredListeners.keySet()) {
             ListenerContext listenerContext = _registeredListeners.get(listenerRegName);
-            if (listenerContext.getListenerInterests().contains(publisherEvent.getName())) {
+            if (listenerContext.getListenerInterests().contains(publisherEvent.getInterestName())) {
 //                System.out.println("SendEventToSubscribers: " + listenerRegName + ":" + listenerContext.getListenerRegName());
-                publisherEvent.setListenerRegName(listenerContext.getListenerRegName());
                 listenerContext.getListener().listenerHandler(publisherEvent);
             }
         }
     }
 
 
-    public void sendEventToSpecificListenerName(String listenerRegName, Object body) {
+    public void sendEventToPrivateSubscriberName(String listenerRegName, Object body) {
         PublisherEvent publisherEvent = new PublisherEvent(listenerRegName, body);
-        publisherEvent.setType(Facade.EVENT_TYPE_SPECIFIC);
-        sendEventToSpecificListenerName(publisherEvent);
+        publisherEvent.setType(Facade.EVENT_TYPE_PRIVATE);
+        sendEventToPrivateSubscriberName(publisherEvent);
     }
-    private void sendEventToSpecificListenerName(IPublisherEvent publisherEvent) {
+    private void sendEventToPrivateSubscriberName(IPublisherEvent publisherEvent) {
         for (ListenerContext listenerContext : _registeredListeners.values()) {
-            if (listenerContext.getListenerRegName().equals(publisherEvent.getName())) {
+            if (listenerContext.getListenerRegName().equals(publisherEvent.getPrivateSubscriberName())) {
                 System.out.println("sendEventToSpecificListenerName: " + listenerContext.getListenerRegName());
-                publisherEvent.setListenerRegName(listenerContext.getListenerRegName());
                 listenerContext.getListener().listenerHandler(publisherEvent);
             }
         }
@@ -316,9 +365,8 @@ public final class Publisher {
     }
     private void sendEventToGroup(IPublisherEvent publisherEvent) {
         for (ListenerContext listenerContext : _registeredListeners.values()) {
-            if (listenerContext.getListenerGroupName().equals(publisherEvent.getName())) {
+            if (listenerContext.getListenerGroupName().equals(publisherEvent.getGroupName())) {
                 System.out.println("sendEventToGroup: " + listenerContext.getListenerRegName());
-                publisherEvent.setListenerRegName(listenerContext.getListenerRegName());
                 listenerContext.getListener().listenerHandler(publisherEvent);
             }
         }
@@ -327,7 +375,6 @@ public final class Publisher {
     private void sendBroadcastEvent(IPublisherEvent publisherEvent) {
         for (ListenerContext listenerContext : _registeredListeners.values()) {
             System.out.println("sendBroadcastEvent: " + listenerContext.getListenerRegName());
-            publisherEvent.setListenerRegName(listenerContext.getListenerRegName());
             listenerContext.getListener().listenerHandler(publisherEvent);
         }
     }

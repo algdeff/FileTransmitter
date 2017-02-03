@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
-public class NetworkServerClientHandler implements Runnable {
+public class NetworkServerClientHandler implements IListener, Runnable {
 
     private Path _receivedPath;
     private Path _outcomingPath;
@@ -80,9 +80,10 @@ public class NetworkServerClientHandler implements Runnable {
                 InputStream inputStream = Channels.newInputStream(_serverSocketChanhel);
                 _objectInputStream = new ObjectInputStream(inputStream);
                 initOutcomeEventsToClientQueue();
-                initTransitionEventSender();
+//                initTransitionEventSender();
+                registerOnPublisher();
 
-                sendEventToClient(new PublisherEvent(Facade.CMD_SERVER_SET_CLIENT_ID, _clientID).toServerCommand());
+                sendEventToClient(new PublisherEvent(Facade.SERVER_SET_CLIENT_ID, _clientID).toServerCommand());
 
                 while (_sessionActive) {
                     Object receivedObject = _objectInputStream.readObject();
@@ -94,11 +95,11 @@ public class NetworkServerClientHandler implements Runnable {
                     PublisherEvent eventFromClient = (PublisherEvent) receivedObject;
 
                     if (eventFromClient.getServerCommand() == null) {
-                        messageLog("No server command found in event: " + eventFromClient.getName());
+                        messageLog("No server command found in event: " + eventFromClient.getInterestName());
                         continue;
                     }
 
-                    if (eventFromClient.getServerCommand().equals(Facade.CMD_SERVER_TERMINATE)) {
+                    if (eventFromClient.getServerCommand().equals(Facade.SERVER_TERMINATE)) {
                         messageLog("CMD_SERVER_TERMINATE");
                         //clientSocket.close();
                         break;
@@ -123,22 +124,22 @@ public class NetworkServerClientHandler implements Runnable {
     private void parseCommandFromClient(PublisherEvent eventFromClient) {
 
         switch (eventFromClient.getServerCommand()) {
-            case Facade.CMD_SERVER_ADD_FILES: {
+            case Facade.SERVER_ADD_FILES: {
 //                System.err.println("Command: " + command);
                 saveClientFileToReceivedFolder(eventFromClient);
                 return;
             }
-            case Facade.CMD_SERVER_GET_FILES: {
+            case Facade.SERVER_GET_FILES: {
 //                System.err.println("Command: " + command);
                 sendServerFileToClient((String) eventFromClient.getBody());
                 return;
             }
-            case Facade.CMD_SERVER_GET_FILES_LIST: {
+            case Facade.SERVER_GET_FILES_LIST: {
 //                System.err.println("Command: " + command);
                 sendServerFileListToClient();
                 return;
             }
-            case Facade.CMD_SERVER_TRANSITION_EVENT: {
+            case Facade.SERVER_TRANSITION_EVENT: {
                 publishTransitionEventFromClient(eventFromClient);
                 return;
             }
@@ -149,7 +150,7 @@ public class NetworkServerClientHandler implements Runnable {
     }
 
     private void publishTransitionEventFromClient(PublisherEvent eventFromClient) {
-        Publisher.getInstance().sendPublisherEvent(eventFromClient.toGenericEvent());
+        Publisher.getInstance().sendPublisherEvent(eventFromClient);
 
     }
 
@@ -191,14 +192,14 @@ public class NetworkServerClientHandler implements Runnable {
         long fileSize = fileContent.length;
 //        System.out.println(filename + " " + fileToSend.toString() + " " + fileSize);
 
-        PublisherEvent eventToClient = new PublisherEvent(Facade.CMD_SERVER_GET_FILES, fileContent).toServerCommand();
+        PublisherEvent eventToClient = new PublisherEvent(Facade.SERVER_GET_FILES, fileContent).toServerCommand();
         eventToClient.setArgs(fileToSend.toString(), fileSize);
         sendEventToClient(eventToClient);
 
     }
 
     private void sendServerFileListToClient() {
-        PublisherEvent eventToServer = new PublisherEvent(Facade.CMD_SERVER_GET_FILES_LIST).toServerCommand();
+        PublisherEvent eventToServer = new PublisherEvent(Facade.SERVER_GET_FILES_LIST).toServerCommand();
         eventToServer.setBody(getServerOutcommingPathContent());
         sendEventToClient(eventToServer);
 
@@ -229,24 +230,24 @@ public class NetworkServerClientHandler implements Runnable {
 
     }
 
-    private void initTransitionEventSender() {
-        Thread senderThread = new Thread(_clientHandlerThreads, () -> {
-            try {
-                while (_sessionActive) {
-                    PublisherEvent outcomeTransitionEvent = Publisher.getInstance().getTransitionEvent();
-                    outcomeTransitionEvent.setServerCommand(Facade.CMD_SERVER_TRANSITION_EVENT);
-                    sendEventToClient(outcomeTransitionEvent);
-                    System.out.println("outcomeTransitionEvent send");
-
-                }
-            } catch (Exception e) {
-                messageLog("TE break!");
-            }
-        }, "initTransitionEventSenderThread");
-        senderThread.start();
-//        ThreadPoolManager.getInstance().addRunnableTask(_transitionEventSenderThread);
-
-    }
+//    private void initTransitionEventSender() {
+//        Thread senderThread = new Thread(_clientHandlerThreads, () -> {
+//            try {
+//                while (_sessionActive) {
+//                    PublisherEvent outcomeTransitionEvent = Publisher.getInstance().getTransitionEvent();
+//                    outcomeTransitionEvent.setServerCommand(Facade.SERVER_TRANSITION_EVENT);
+//                    sendEventToClient(outcomeTransitionEvent);
+//                    System.out.println("outcomeTransitionEvent send");
+//
+//                }
+//            } catch (Exception e) {
+//                messageLog("TE break!");
+//            }
+//        }, "initTransitionEventSenderThread");
+//        senderThread.start();
+////        ThreadPoolManager.getInstance().addRunnableTask(_transitionEventSenderThread);
+//
+//    }
 
     private List<String> getServerOutcommingPathContent() {
         List<String> fileList = new ArrayList<>();
@@ -286,4 +287,23 @@ public class NetworkServerClientHandler implements Runnable {
         Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_RECORD, message);
     }
 
+    @Override
+    public void registerOnPublisher() {
+        Publisher.getInstance().registerRemoteClient(this, _clientID, Facade.TRANSITION_EVENT_GROUP_ALL_USERS);
+    }
+
+    @Override
+    public String[] listenerInterests() {
+        return new String[0];
+    }
+
+    @Override
+    public void listenerHandler(IPublisherEvent outcomeTransitionEvent) {
+        if (outcomeTransitionEvent.getServerCommand().equals(Facade.SERVER_TRANSITION_EVENT)) {
+            messageLog("Send transition event to client: " + _clientID);
+            sendEventToClient((PublisherEvent) outcomeTransitionEvent);
+            return;
+        }
+
+    }
 }

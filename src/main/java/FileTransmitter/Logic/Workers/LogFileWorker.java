@@ -120,10 +120,10 @@ public class LogFileWorker implements IListener {
         if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
             addLog(publisherEvent.getBody().toString());
             System.err.println(getDateTimeNow() + " - Logger received group event ("
-                    + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
+                    + publisherEvent.getInterestName() + "): \n" + publisherEvent.getBody().toString());
         }
 
-        switch (publisherEvent.getName()) {
+        switch (publisherEvent.getInterestName()) {
             case Facade.CMD_LOGGER_ADD_LOG: {
                 addLog(publisherEvent.getBody().toString());
                 System.err.println(publisherEvent.getBody().toString());
@@ -139,7 +139,7 @@ public class LogFileWorker implements IListener {
             }
             case Facade.CMD_LOGGER_CLEAR_LOG: {
                 System.out.println("Logger event ("
-                        + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
+                        + publisherEvent.getInterestName() + "): \n" + publisherEvent.getBody().toString());
                 break;
             }
         }

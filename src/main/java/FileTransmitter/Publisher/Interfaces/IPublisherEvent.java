@@ -2,8 +2,8 @@ package FileTransmitter.Publisher.Interfaces;
 
 public interface IPublisherEvent {
 
-    public String getName();
-    public void setName(String name);
+    public String getInterestName();
+    public void setInterestName(String interestName);
 
     public Object getBody();
     public void setBody(Object body);
@@ -15,10 +15,13 @@ public interface IPublisherEvent {
     public String getType();
     public void setType(String type);
 
+    public String getGroupName();
+    public void setGroupName(String groupName);
+
     public String getServerCommand();
     public void setServerCommand(String serverCommand);
 
-    public String getListenerRegName();
-    public void setListenerRegName(String listenerRegName);
+    public String getPrivateSubscriberName();
+    public void setPrivateSubscriberName(String privateSubscriberName);
 
 }

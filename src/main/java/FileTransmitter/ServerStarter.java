@@ -59,7 +59,7 @@ public class ServerStarter {
 
     private void stop() {
 
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_SERVER_TERMINATE);
+        Publisher.getInstance().sendPublisherEvent(Facade.SERVER_TERMINATE);
         System.err.println("Server STOP");
     }
 

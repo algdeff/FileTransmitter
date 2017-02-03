@@ -3,11 +3,11 @@ package FileTransmitter;
 public final class Facade {
 
     public static final String  EVENT_TYPE_BROADCAST  =  "event_type_broadcast",
-                                 EVENT_TYPE_SPECIFIC  =  "event_type_to_specific_reg_name",
+                                  EVENT_TYPE_PRIVATE  =  "event_type_private_to_specific_reg_name",
                                     EVENT_TYPE_GROUP  =  "event_type_group",
                                 EVENT_TYPE_SUBSCRIBE  =  "event_type_subscribe_interests",
                                   EVENT_TYPE_GENERIC  =  "event_type_generic",
-                          EVENT_TYPE_SERVERGROUP_CMD  =  "event_type_servergroup_cmd",
+//                          EVENT_TYPE_SERVERGROUP_CMD  =  "event_type_servergroup_cmd",
 
                                      EVENT_GROUP_ALL  =  "event_group_all",
                                   EVENT_GROUP_LOGGER  =  "logger_group_event",
@@ -17,6 +17,9 @@ public final class Facade {
                                 EVENT_GROUP_EXECUTOR  =  "event_group_executor",
                               EVENT_GROUP_NET_SERVER  =  "event_group_net_server",
                               EVENT_GROUP_NET_CLIENT  =  "event_group_net_client",
+
+                    TRANSITION_EVENT_GROUP_ALL_USERS  =  "event_group_transition_all_users",
+                       TRANSITION_EVENT_GROUP_CLIENT  =  "transition_event_group_client",
 
                                         CMD_DB_FLUSH  =  "cmd_db_flush",
                                      CMD_DB_SHUTDOWN  =  "cmd_db_shutdown",
@@ -41,12 +44,12 @@ public final class Facade {
 
 //           CMD_SERVER_INTERNAL_SEND_TRANSITION_EVENT  =  "cmd_server_internal_send_transition_event",
 
-                            CMD_SERVER_SET_CLIENT_ID  =  "cmd_server_set_client_id",
-                           CMD_SERVER_GET_FILES_LIST  =  "cmd_server_get_files_list",
-                                CMD_SERVER_GET_FILES  =  "cmd_server_get_files",
-                                CMD_SERVER_ADD_FILES  =  "cmd_server_add_files",
-                         CMD_SERVER_TRANSITION_EVENT  =  "cmd_server_transition_event",
-                                CMD_SERVER_TERMINATE  =  "cmd_server_terminate";
+                                SERVER_SET_CLIENT_ID  =  "cmd_server_set_client_id",
+                               SERVER_GET_FILES_LIST  =  "cmd_server_get_files_list",
+                                    SERVER_GET_FILES  =  "cmd_server_get_files",
+                                    SERVER_ADD_FILES  =  "cmd_server_add_files",
+                             SERVER_TRANSITION_EVENT  =  "cmd_server_transition_event",
+                                    SERVER_TERMINATE  =  "cmd_server_terminate";
 
 
 

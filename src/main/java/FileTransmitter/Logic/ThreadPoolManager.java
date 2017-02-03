@@ -226,10 +226,10 @@ public final class ThreadPoolManager implements IListener {
     public void listenerHandler(IPublisherEvent publisherEvent) {
         if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
             messageLog("Executor received group event ("
-                    + publisherEvent.getName() + "): \n" + publisherEvent.getBody().toString());
+                    + publisherEvent.getInterestName() + "): \n" + publisherEvent.getBody().toString());
         }
 
-        switch (publisherEvent.getName()) {
+        switch (publisherEvent.getInterestName()) {
             case Facade.CMD_EXECUTOR_PUT_TASK: {
 
                 PublisherEvent transitionEvent = new PublisherEvent(Facade.CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
@@ -249,7 +249,7 @@ public final class ThreadPoolManager implements IListener {
                 //work......
 
                 PublisherEvent transitionEvent = new PublisherEvent(Facade.CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
-                Publisher.getInstance().sendTransitionEvent(transitionEvent);
+                Publisher.getInstance().sendTransitionEvent(transitionEvent, null, Facade.TRANSITION_EVENT_GROUP_ALL_USERS);
                 break;
             }
 

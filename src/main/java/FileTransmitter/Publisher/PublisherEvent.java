@@ -7,7 +7,7 @@ import java.io.Serializable;
 
 public class PublisherEvent implements IPublisherEvent, Serializable {
 
-    private String _name, _type, _serverCommand, _listenerRegName;
+    private String _interestName, _type, _groupName, _serverCommand, _privateSubscriberName;
     private Object _body;
     private Object[] _args;
 
@@ -17,26 +17,28 @@ public class PublisherEvent implements IPublisherEvent, Serializable {
     public PublisherEvent() {
         this(null);
     }
-    public PublisherEvent(String name) {
-        this(name, null);
+    public PublisherEvent(String interestName) {
+        this(interestName, null);
     }
-    public PublisherEvent(String name, Object body) {
-        this(name, body, NULL_ARRAY);
+    public PublisherEvent(String interestName, Object body) {
+        this(interestName, body, NULL_ARRAY);
     }
-    public PublisherEvent(String name, Object body, Object ...args) {
-        _name = name;
+    public PublisherEvent(String interestName, Object body, Object ...args) {
+        _interestName = interestName;
         _body = body;
         _args = (args == null) ? NULL_ARRAY : args;
-        _type = name != null ? Facade.EVENT_TYPE_SUBSCRIBE : Facade.EVENT_TYPE_GROUP;
-        _serverCommand = null;
-        _listenerRegName = null;
+        _type = interestName != null ? Facade.EVENT_TYPE_SUBSCRIBE : Facade.EVENT_TYPE_GROUP;
+
+        _groupName = "";
+        _serverCommand = "";
+        _privateSubscriberName = "";
     }
 
-    public String getName() {
-        return _name;
+    public String getInterestName() {
+        return _interestName;
     }
-    public void setName(String name) {
-        _name = name;
+    public void setInterestName(String interestName) {
+        _interestName = interestName;
     }
 
     public Object getBody() {
@@ -63,6 +65,13 @@ public class PublisherEvent implements IPublisherEvent, Serializable {
         _type = type;
     }
 
+    public String getGroupName() {
+        return _groupName;
+    }
+    public void setGroupName(String groupName) {
+        _groupName = groupName;
+    }
+
     public String getServerCommand() {
         return _serverCommand;
     }
@@ -70,21 +79,40 @@ public class PublisherEvent implements IPublisherEvent, Serializable {
         _serverCommand = serverCommand;
     }
 
-    public String getListenerRegName() {
-        return _listenerRegName;
+    public String getPrivateSubscriberName() {
+        return _privateSubscriberName;
     }
-    public void setListenerRegName(String listenerRegName) {
-        _listenerRegName = listenerRegName;
+    public void setPrivateSubscriberName(String privateSubscriberName) {
+        _privateSubscriberName = privateSubscriberName;
     }
 
-    public PublisherEvent toServerCommand() {
-        setType(Facade.EVENT_TYPE_SERVERGROUP_CMD);
-        setServerCommand(_name);
+    public PublisherEvent toSubscribeEvent(String interestName) {
+        setInterestName(interestName);
+        setType(Facade.EVENT_TYPE_SUBSCRIBE);
         return this;
     }
 
+    public PublisherEvent toPrivateEvent(String privateSubscriberName) {
+        setType(Facade.EVENT_TYPE_PRIVATE);
+        setPrivateSubscriberName(privateSubscriberName);
+        return this;
+
+    }
+
+    public PublisherEvent toGroupEvent(String groupName) {
+        setType(Facade.EVENT_TYPE_PRIVATE);
+        setGroupName(groupName);
+        return this;
+    }
+
+
     public PublisherEvent toGenericEvent() {
         setServerCommand(null);
+        return this;
+    }
+
+    public PublisherEvent toServerCommand() {
+        setServerCommand(getInterestName());
         return this;
     }
 
