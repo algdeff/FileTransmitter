@@ -2,27 +2,22 @@ package FileTransmitter.Logic.Network;
 
 import FileTransmitter.Facade;
 import FileTransmitter.Logic.ConfigManager;
-import FileTransmitter.Logic.ThreadPoolManager;
-import FileTransmitter.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.ISubscriber;
 import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.Publisher.PublisherEvent;
 import FileTransmitter.ServerStarter;
-import com.sun.jmx.snmp.ThreadContext;
-import com.sun.jmx.snmp.tasks.ThreadService;
-import sun.misc.ThreadGroupUtils;
 
 import java.io.*;
 import java.net.SocketAddress;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.Channels;
-import java.nio.channels.ClosedChannelException;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
-public class NetworkServerClientHandler implements IListener, Runnable {
+public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
     private Path _receivedPath;
     private Path _outcomingPath;
@@ -289,11 +284,11 @@ public class NetworkServerClientHandler implements IListener, Runnable {
 
     @Override
     public void registerOnPublisher() {
-        Publisher.getInstance().registerRemoteClient(this, _clientID, Facade.TRANSITION_EVENT_GROUP_ALL_USERS);
+        Publisher.getInstance().registerRemoteUser(this, _clientID, Facade.TRANSITION_EVENT_GROUP_ALL_USERS);
     }
 
     @Override
-    public String[] listenerInterests() {
+    public String[] subscriberInterests() {
         return new String[0];
     }
 

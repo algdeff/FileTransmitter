@@ -2,7 +2,7 @@ package FileTransmitter.Logic.Workers;
 
 import FileTransmitter.Facade;
 import FileTransmitter.Logic.ConfigManager;
-import FileTransmitter.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.ISubscriber;
 import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.ServerStarter;
@@ -15,7 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class LogFileWorker implements IListener {
+public class LogFileWorker implements ISubscriber {
 
     private Path _logFilePath;
     private static BlockingQueue<List<String>> _queue;
@@ -101,11 +101,11 @@ public class LogFileWorker implements IListener {
 
     @Override
     public void registerOnPublisher() {
-        Publisher.getInstance().registerNewListener(this, Facade.EVENT_GROUP_LOGGER);
+        Publisher.getInstance().registerNewSubscriber(this, Facade.EVENT_GROUP_LOGGER);
     }
 
     @Override
-    public String[] listenerInterests() {
+    public String[] subscriberInterests() {
         return new String[] {
                 Facade.CMD_LOGGER_ADD_LOG,
                 Facade.CMD_LOGGER_ADD_RECORD,

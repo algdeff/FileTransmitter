@@ -2,7 +2,7 @@ package FileTransmitter.Logic.Network;
 
 import FileTransmitter.Facade;
 import FileTransmitter.Logic.ConfigManager;
-import FileTransmitter.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.ISubscriber;
 import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.Publisher.PublisherEvent;
@@ -11,20 +11,16 @@ import FileTransmitter.ServerStarter;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.SocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.Channels;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
-public class FileClient implements IListener {
+public class FileClient implements ISubscriber {
 
     private Path _receivedPath;
     private Path _outcomingPath;
@@ -312,8 +308,8 @@ public class FileClient implements IListener {
         }
 
         private void serverCommandListener() {
-            while (true) {
-                try {
+            try {
+                while (true) {
                     Object receivedObject = _objectInputStream.readObject();
 
                     if (!receivedObject.getClass().getName().equals(PublisherEvent.class.getName())) {
@@ -333,17 +329,17 @@ public class FileClient implements IListener {
                         break;
                     }
                     parseCommandFromServer(eventFromServer);
-
-                } catch (IOException e) {
-                    toLog(e.getMessage());
-                } catch (ClassNotFoundException e) {
-                    toLog(e.getMessage());
                 }
 
+            } catch (IOException e) {
+//                    toLog(e.getMessage());
+                messageLog(e.getMessage());
+            } catch (ClassNotFoundException e) {
+                messageLog(e.getMessage());
+//                    toLog(e.getMessage());
             }
-//            System.err.println("echo thread close");
-        }
 
+        }
 
 
         private void parseCommandFromServer(PublisherEvent eventFromServer) {
@@ -451,11 +447,11 @@ public class FileClient implements IListener {
 
     @Override
     public void registerOnPublisher() {
-        Publisher.getInstance().registerNewListener(this, Facade.TRANSITION_EVENT_GROUP_CLIENT);
+        Publisher.getInstance().registerNewSubscriber(this, Facade.TRANSITION_EVENT_GROUP_CLIENT);
     }
 
     @Override
-    public String[] listenerInterests() {
+    public String[] subscriberInterests() {
         return new String[] {
                 Facade.CMD_NET_CLIENT_UI_BREAK,
                 Facade.CMD_NET_CLIENT_SHUTDOWN

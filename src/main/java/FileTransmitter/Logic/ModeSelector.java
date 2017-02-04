@@ -1,6 +1,7 @@
 package FileTransmitter.Logic;
 
 import FileTransmitter.Facade;
+import FileTransmitter.Logic.ConfigManager;
 import FileTransmitter.Logic.Network.FileClient;
 import FileTransmitter.Logic.Network.NetworkServer;
 import FileTransmitter.Logic.Workers.LogFileWorker;

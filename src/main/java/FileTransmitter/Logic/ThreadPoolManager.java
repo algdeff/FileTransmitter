@@ -1,7 +1,7 @@
 package FileTransmitter.Logic;
 
 import FileTransmitter.Facade;
-import FileTransmitter.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.ISubscriber;
 import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 import FileTransmitter.Publisher.Publisher;
 import FileTransmitter.Publisher.PublisherEvent;
@@ -10,7 +10,7 @@ import java.util.concurrent.*;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-public final class ThreadPoolManager implements IListener {
+public final class ThreadPoolManager implements ISubscriber {
 
     private static int _threadsNumber;
     private static PoolWorker[] _threads;
@@ -119,6 +119,10 @@ public final class ThreadPoolManager implements IListener {
         }
     }
 
+    public void executeRunnable(Runnable runnable) {
+        _executorService.execute(runnable);
+    }
+
     public void executeFutureTask (Callable callable) {
         System.err.println("ADD TASK");
         _completionService.submit(callable);
@@ -210,11 +214,11 @@ public final class ThreadPoolManager implements IListener {
 
     @Override
     public void registerOnPublisher() {
-        Publisher.getInstance().registerNewListener(this, Facade.EVENT_GROUP_EXECUTOR);
+        Publisher.getInstance().registerNewSubscriber(this, Facade.EVENT_GROUP_EXECUTOR);
     }
 
     @Override
-    public String[] listenerInterests() {
+    public String[] subscriberInterests() {
         return new String[] {
                 Facade.CMD_EXECUTOR_PUT_TASK,
                 Facade.CMD_EXECUTOR_TAKE_TASK,

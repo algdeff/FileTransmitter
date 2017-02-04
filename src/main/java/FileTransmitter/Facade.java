@@ -39,6 +39,7 @@ public final class Facade {
                       CMD_TASK_EXECUTOR_ADD_NEW_TASK  =  "cmd_task_executor_add_new_task",
 
                              CMD_TASK_PRODUCER_START  =  "cmd_task_producer_start",
+                 CMD_TASK_PRODUCER_REGISTER_EXECUTOR  =  "cmd_task_producer_register_executor",
              CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK  =  "cmd_task_producer_collect_complete_task",
                       CMD_TASK_PRODUCER_GET_NEW_TASK  =  "cmd_task_producer_get_new_task",
 

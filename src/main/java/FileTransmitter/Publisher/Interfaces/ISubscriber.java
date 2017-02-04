@@ -1,7 +1,7 @@
 package FileTransmitter.Publisher.Interfaces;
 
-public interface IListener {
+public interface ISubscriber {
     void registerOnPublisher();
-    String[] listenerInterests();
+    String[] subscriberInterests();
     void listenerHandler(IPublisherEvent publisherEvent);
 }

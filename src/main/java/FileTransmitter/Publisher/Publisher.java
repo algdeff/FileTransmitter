@@ -1,36 +1,34 @@
 package FileTransmitter.Publisher;
 
 import FileTransmitter.Facade;
-import FileTransmitter.Publisher.Interfaces.IListener;
+import FileTransmitter.Publisher.Interfaces.ISubscriber;
 import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
 
 import java.util.*;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.LinkedBlockingQueue;
 
 public final class Publisher {
 
     /**
-     *                          _registeredListeners
-     *          Key = registered listener Name - default, Class name from object.toString,
-     *          Values = listener object included listener class link
+     *                          _registeredSubscribers
+     *          Key = registered subscriber Name - default, Class name from object.toString,
+     *          Values = subscriber object included subscriber class link
      *
-     *                      _listenersEventMap
+     *                      _subscribersEventMap
      *          Key = eventName,
-     *          Value = List of listeners names;
+     *          Value = List of subscribers names;
      */
-    private static ConcurrentMap<String, ListenerContext> _registeredListeners;
-    private static ConcurrentMap<String, List<String>> _listenersEventMap;
-    private static ConcurrentMap<String, ListenerContext> _registeredRemoteUsers;
+    private static ConcurrentMap<String, SubscriberContext> _registeredSubscribers;
+    private static ConcurrentMap<String, List<String>> _subscribersEventMap;
+    private static ConcurrentMap<String, SubscriberContext> _registeredRemoteUsers;
     private static volatile Publisher instance;
 
 //    private static BlockingQueue<PublisherEvent> _transitionEventsQueue;
 
     private Publisher() {
-        _registeredListeners = new ConcurrentHashMap<>();
-        _listenersEventMap = new ConcurrentHashMap<>();
+        _registeredSubscribers = new ConcurrentHashMap<>();
+        _subscribersEventMap = new ConcurrentHashMap<>();
         _registeredRemoteUsers = new ConcurrentHashMap<>();
 //        _transitionEventsQueue = new LinkedBlockingQueue<>();
 
@@ -49,166 +47,150 @@ public final class Publisher {
 
 
     /**
-     *  register new Listener (Subscriber)
+     *  register new Subscriber (Subscriber)
      */
 
-    public boolean registerNewListener(IListener listener) {
-        return registerNewListener(listener, null);
+    public boolean registerNewSubscriber(ISubscriber subscriber) {
+        return registerNewSubscriber(subscriber, null);
     }
-    public boolean registerNewListener(IListener listener, String listenerGroupName) {
-        return registerNewListener(listener, listenerGroupName, null);
+    public boolean registerNewSubscriber(ISubscriber subscriber, String subscriberGroupName) {
+        return registerNewSubscriber(subscriber, subscriberGroupName, null);
     }
-    public boolean registerNewListener(IListener listener, String listenerGroupName, String listenerRegName) {
-        String listenerName = listenerRegName != null ? listenerRegName : listener.toString();
-        if (_registeredListeners.containsKey(listener.toString()) || _registeredListeners.containsKey(listenerName)) {
+    public boolean registerNewSubscriber(ISubscriber subscriber, String subscriberGroupName, String subscriberRegName) {
+        String subscriberName = subscriberRegName != null ? subscriberRegName : subscriber.toString();
+        if (_registeredSubscribers.containsKey(subscriber.toString()) || _registeredSubscribers.containsKey(subscriberName)) {
             return false;
         }
 
-        ListenerContext context = new ListenerContext(listener, listenerGroupName, listenerName);
-        _registeredListeners.put(listenerName, context);
-        updateListenersEventMap();
+        SubscriberContext context = new SubscriberContext(subscriber, subscriberGroupName, subscriberName);
+        _registeredSubscribers.put(subscriberName, context);
+        updateSubscribersEventMap();
 
         return true;
     }
 
 
-    public boolean registerRemoteClient(IListener remoteUserHandler, String User_ID) {
-        return registerRemoteClient(remoteUserHandler, User_ID, null);
+    public boolean registerRemoteUser(ISubscriber remoteUserHandler, String User_ID) {
+        return registerRemoteUser(remoteUserHandler, User_ID, null);
     }
-    public boolean registerRemoteClient(IListener remoteUserHandler, String User_ID, String userGroup) {
+    public boolean registerRemoteUser(ISubscriber remoteUserHandler, String User_ID, String userGroup) {
         if (_registeredRemoteUsers.containsKey(User_ID)) {
             return false;
         }
 
-        ListenerContext context = new ListenerContext(remoteUserHandler, userGroup);
-        context.setListenerRegName(User_ID);
+        SubscriberContext context = new SubscriberContext(remoteUserHandler, userGroup);
+        context.setSubscriberPrivateName(User_ID);
         _registeredRemoteUsers.put(User_ID, context);
         return true;
     }
 
 
 
-    public boolean removeListaner(IListener listener) {
+    public boolean removeListaner(ISubscriber subscriber) {
         boolean success = false;
-        for (String listenerName : _registeredListeners.keySet()) {
-            if (_registeredListeners.get(listenerName).getListener().equals(listener)) {
-                _registeredListeners.remove(listenerName);
+        for (String subscriberName : _registeredSubscribers.keySet()) {
+            if (_registeredSubscribers.get(subscriberName).getSubscriberInstance().equals(subscriber)) {
+                _registeredSubscribers.remove(subscriberName);
                 success = true;
             }
         }
-        updateListenersEventMap();
+        updateSubscribersEventMap();
 
         return success;
     }
-    public boolean removeListener(String listenerRegName) {
-        if (!_registeredListeners.containsKey(listenerRegName)) {
+    public boolean removeSubscriber(String subscriberRegName) {
+        if (!_registeredSubscribers.containsKey(subscriberRegName)) {
             return false;
         }
 
-        _registeredListeners.remove(listenerRegName);
-        updateListenersEventMap();
+        _registeredSubscribers.remove(subscriberRegName);
+        updateSubscribersEventMap();
 
         return true;
     }
 
 
-    public void addEventsToListener(String listenerRegName, String[] newInterests) {
-        _registeredListeners.get(listenerRegName).addListenerInterests(newInterests);
-        updateListenersEventMap();
+    public void addEventsToSubscriber(String subscriberRegName, String[] newInterests) {
+        _registeredSubscribers.get(subscriberRegName).addSubscriberInterests(newInterests);
+        updateSubscribersEventMap();
     }
-    public void removeEventsFromListener(String listenerRegName, String[] interests) {
-        _registeredListeners.get(listenerRegName).removeListenerInterests(interests);
-        updateListenersEventMap();
-    }
-
-    public void addEventsToListenersGroup(String groupName, String[] newInterests) {
-        for (ListenerContext context : _registeredListeners.values()) {
-            if (context.getListenerGroupName().equals(groupName)) {
-                context.addListenerInterests(newInterests);
-            }
-        }
-        updateListenersEventMap();
-    }
-    public void removeEventsFromListenersGroup(String groupName, String[] interests) {
-        for (ListenerContext context : _registeredListeners.values()) {
-            if (context.getListenerGroupName().equals(groupName)) {
-                context.removeListenerInterests(interests);
-            }
-        }
-        updateListenersEventMap();
+    public void removeEventsFromSubscriber(String subscriberRegName, String[] interests) {
+        _registeredSubscribers.get(subscriberRegName).removeSubscriberInterests(interests);
+        updateSubscribersEventMap();
     }
 
-    private void updateListenersEventMap() {
+    public void addEventsToSubscribersGroup(String groupName, String[] newInterests) {
+        for (SubscriberContext context : _registeredSubscribers.values()) {
+            if (context.getSubscriberGroupName().equals(groupName)) {
+                context.addSubscriberInterests(newInterests);
+            }
+        }
+        updateSubscribersEventMap();
+    }
+    public void removeEventsFromSubscribersGroup(String groupName, String[] interests) {
+        for (SubscriberContext context : _registeredSubscribers.values()) {
+            if (context.getSubscriberGroupName().equals(groupName)) {
+                context.removeSubscriberInterests(interests);
+            }
+        }
+        updateSubscribersEventMap();
+    }
+
+    private void updateSubscribersEventMap() {
 //        if (true) return;
-//        _listenersEventMap.clear();
-//        for (String listener : _registeredListeners.keySet()) {
-//            for (String eventName : _registeredListeners.get(listener).getListenerInterests()) {
-//                List<String> listeners = _listenersEventMap.get(eventName);
-//                if (listeners == null) {
-//                    listeners = new ArrayList<>();
-//                    _listenersEventMap.put(eventName, listeners);
+//        _subscribersEventMap.clear();
+//        for (String subscriber : _registeredSubscribers.keySet()) {
+//            for (String eventName : _registeredSubscribers.get(subscriber).getSubscriberInterests()) {
+//                List<String> subscribers = _subscribersEventMap.get(eventName);
+//                if (subscribers == null) {
+//                    subscribers = new ArrayList<>();
+//                    _subscribersEventMap.put(eventName, subscribers);
 //                }
-//                listeners.add(listener);
+//                subscribers.add(subscriber);
 //            }
 //        }
     }
-    public void updateListenersEventMap(ArrayList<String> events) {
-        System.out.println(_listenersEventMap.size());
+    public void updateSubscribersEventMap(ArrayList<String> events) {
+        System.out.println(_subscribersEventMap.size());
 
         for (String eventName : events) {
-            List<String> listeners = _listenersEventMap.get(eventName);
-            for (String listener : listeners) {
-                if (!_registeredListeners.containsKey(listener)) {
-                    listeners.remove(listener);
+            List<String> subscribers = _subscribersEventMap.get(eventName);
+            for (String subscriber : subscribers) {
+                if (!_registeredSubscribers.containsKey(subscriber)) {
+                    subscribers.remove(subscriber);
                 }
             }
-            if (listeners.isEmpty()) {
-                _listenersEventMap.remove(eventName);
+            if (subscribers.isEmpty()) {
+                _subscribersEventMap.remove(eventName);
             } else {
-                _listenersEventMap.replace(eventName, listeners);
+                _subscribersEventMap.replace(eventName, subscribers);
             }
         }
 
-        System.out.println(_listenersEventMap.size());
+        System.out.println(_subscribersEventMap.size());
 
     }
 
-    public boolean listenerIsRegistered(IListener listener) {
+    public boolean subscriberIsRegistered(ISubscriber subscriber) {
         boolean success = false;
-        for (String listenerName : _registeredListeners.keySet()) {
-            if (_registeredListeners.get(listenerName).getListener().equals(listener)) {
-                _registeredListeners.remove(listenerName);
+        for (String subscriberName : _registeredSubscribers.keySet()) {
+            if (_registeredSubscribers.get(subscriberName).getSubscriberInstance().equals(subscriber)) {
+                _registeredSubscribers.remove(subscriberName);
                 success = true;
             }
         }
         return success;
     }
-    public boolean listenerIsRegistered(String uniqueName) {
-        return _registeredListeners.containsKey(uniqueName);
+    public boolean isSubscriberRegistered(String privateName) {
+        return _registeredSubscribers.containsKey(privateName);
+    }
+    public boolean isUserRegistered(String User_ID) {
+        return _registeredRemoteUsers.containsKey(User_ID);
+    }
+    public boolean isEventRegistered(String eventName) {
+        return _subscribersEventMap.containsKey(eventName);
     }
 
-    public boolean eventIsRegistered(String eventName) {
-        return _listenersEventMap.containsKey(eventName);
-//        for (ListenerContext context : _registeredListeners.values()) {
-//            for (String interestName : context.getListenerInterests()) {
-//                if (interestName.equals(eventName)) {
-//                    return true;
-//                }
-//            }
-//        }
-//        return false;
-    }
-
-
-
-//    public void sendTransitionEvent(String eventName) {
-//        PublisherEvent transitionEvent = new PublisherEvent(eventName, null);
-//        sendTransitionEvent(transitionEvent);
-//    }
-//    public void sendTransitionEvent(String eventName, Object body) {
-//        PublisherEvent transitionEvent = new PublisherEvent(eventName, body);
-//        sendTransitionEvent(transitionEvent);
-//    }
 
     public void sendTransitionEvent(IPublisherEvent publisherEvent) {
         sendTransitionEvent(publisherEvent, null, null);
@@ -219,43 +201,31 @@ public final class Publisher {
     public void sendTransitionEvent(IPublisherEvent publisherEvent, String ClientID, String groupName) {
         publisherEvent.setServerCommand(Facade.SERVER_TRANSITION_EVENT);
         if (groupName != null) {
-            for (ListenerContext remoteClientsContext : _registeredRemoteUsers.values()) {
-                if (remoteClientsContext.getListenerGroupName().equals(groupName)) {
+            for (SubscriberContext remoteClientsContext : _registeredRemoteUsers.values()) {
+                if (remoteClientsContext.getSubscriberGroupName().equals(groupName)) {
                     System.out.println("SendTransitionEventToClientsGroup: " + groupName);
-                    remoteClientsContext.getListener().listenerHandler(publisherEvent);
+                    remoteClientsContext.getSubscriberInstance().listenerHandler(publisherEvent);
                 }
             }
             return;
         }
         if (ClientID != null) {
-            for (ListenerContext remoteClientsContext : _registeredRemoteUsers.values()) {
-                if (remoteClientsContext.getListenerRegName().equals(ClientID)) {
-                    System.out.println("Send Transition Event to Clients Group: " + remoteClientsContext.getListenerRegName());
-                    remoteClientsContext.getListener().listenerHandler(publisherEvent);
+            for (SubscriberContext remoteClientsContext : _registeredRemoteUsers.values()) {
+                if (remoteClientsContext.getSubscriberPrivateName().equals(ClientID)) {
+                    System.out.println("Send Transition Event to Clients Group: " + remoteClientsContext.getSubscriberPrivateName());
+                    remoteClientsContext.getSubscriberInstance().listenerHandler(publisherEvent);
                 }
             }
             return;
         }
-        for (ListenerContext listenerContext : _registeredListeners.values()) {
-            if (listenerContext.getListenerGroupName().equals(Facade.TRANSITION_EVENT_GROUP_CLIENT)) {
+        for (SubscriberContext subscriberContext : _registeredSubscribers.values()) {
+            if (subscriberContext.getSubscriberGroupName().equals(Facade.TRANSITION_EVENT_GROUP_CLIENT)) {
                 System.out.println("Send Transition Event to server");
-                listenerContext.getListener().listenerHandler(publisherEvent);
+                subscriberContext.getSubscriberInstance().listenerHandler(publisherEvent);
             }
-
         }
 
     }
-
-//    public PublisherEvent getTransitionEvent() {
-//        PublisherEvent publisherEvent = null;
-//        try {
-//            publisherEvent = _transitionEventsQueue.take();
-//        } catch (InterruptedException e) {
-//            System.err.println("PUBLISHER: Transition event interrupted!");
-//        }
-//        return publisherEvent;
-//
-//    }
 
     private Object blankObject() {
         return new Object();
@@ -276,7 +246,7 @@ public final class Publisher {
             return;
         }
 
-//        System.out.println("SPE"+publisherEvent.getName()+publisherEvent.getType()+publisherEvent.getBody().toString());
+//        System.out.println("SPE"+publisherEvent.getInterestName()+publisherEvent.getType()+publisherEvent.getBody().toString());
 
         switch (publisherEvent.getType()) {
             case Facade.EVENT_TYPE_SUBSCRIBE: {
@@ -297,85 +267,56 @@ public final class Publisher {
             }
 
         }
-
         System.err.println("Incorrect event type: " + publisherEvent.getType());
 
-
-//        String eventName = publisherEvent.getName();
-//        List<String> listeners = _listenersEventMap.get(eventName);
-//
-//        if (listeners == null || listeners.size() == 0) {
-//            System.out.println("Publisher: this event is not registered");
-//            return;
-//        }
-//
-//        for (String listenerName : listeners) {
-//            ListenerContext context = _registeredListeners.get(listenerName);
-//            if (context == null) {
-//                System.out.println("sendPublisherEvent ERROR");
-//                continue;
-//            }
-//            publisherEvent.setGroupName(context.getGroupName());
-//            publisherEvent.setListenerRegName(context.getListenerRegName());
-//            context.getListener().listenerHandler(publisherEvent);
-//        }
     }
 
     private void sendEventToSubscribers(IPublisherEvent publisherEvent) {
-//        if (!publisherEvent.getType().equals(Facade.EVENT_TYPE_SUBSCRIBE)) {
-//            System.err.println("Incorrect event type: " + publisherEvent.getType());
-//            return;
-//        }
-//        System.out.println("sets"+_registeredListeners.size());
-
-        for (String listenerRegName : _registeredListeners.keySet()) {
-            ListenerContext listenerContext = _registeredListeners.get(listenerRegName);
-            if (listenerContext.getListenerInterests().contains(publisherEvent.getInterestName())) {
-//                System.out.println("SendEventToSubscribers: " + listenerRegName + ":" + listenerContext.getListenerRegName());
-                listenerContext.getListener().listenerHandler(publisherEvent);
+        for (String subscriberRegName : _registeredSubscribers.keySet()) {
+            SubscriberContext subscriberContext = _registeredSubscribers.get(subscriberRegName);
+            if (subscriberContext.getSubscriberInterests().contains(publisherEvent.getInterestName())) {
+//                System.out.println("SendEventToSubscribers: " + subscriberRegName + ":" + subscriberContext.getSubscriberPrivateName());
+                subscriberContext.getSubscriberInstance().listenerHandler(publisherEvent);
             }
         }
     }
 
 
-    public void sendEventToPrivateSubscriberName(String listenerRegName, Object body) {
-        PublisherEvent publisherEvent = new PublisherEvent(listenerRegName, body);
-        publisherEvent.setType(Facade.EVENT_TYPE_PRIVATE);
-        sendEventToPrivateSubscriberName(publisherEvent);
+    public void sendEventToPrivateSubscriberName(String subscriberRegName, Object body) {
+        sendEventToPrivateSubscriberName(new PublisherEvent(subscriberRegName, body));
     }
     private void sendEventToPrivateSubscriberName(IPublisherEvent publisherEvent) {
-        for (ListenerContext listenerContext : _registeredListeners.values()) {
-            if (listenerContext.getListenerRegName().equals(publisherEvent.getPrivateSubscriberName())) {
-                System.out.println("sendEventToSpecificListenerName: " + listenerContext.getListenerRegName());
-                listenerContext.getListener().listenerHandler(publisherEvent);
+        publisherEvent.setType(Facade.EVENT_TYPE_PRIVATE);
+        for (SubscriberContext subscriberContext : _registeredSubscribers.values()) {
+            if (subscriberContext.getSubscriberPrivateName().equals(publisherEvent.getPrivateSubscriberName())) {
+                System.out.println("sendEventToSpecificSubscriberName: " + subscriberContext.getSubscriberPrivateName());
+                subscriberContext.getSubscriberInstance().listenerHandler(publisherEvent);
             }
         }
 
     }
 
     public void sendEventToGroup(String targetGroup, Object body) {
-        PublisherEvent publisherEvent = new PublisherEvent(targetGroup, body);
-        publisherEvent.setType(Facade.EVENT_TYPE_GROUP);
-        sendEventToGroup(publisherEvent);
+        sendEventToGroup(new PublisherEvent(targetGroup, body));
     }
     public void sendEventToGroup(String targetGroup, Object body, Object ...args) {
-        PublisherEvent publisherEvent = new PublisherEvent(targetGroup, body, args);
-        publisherEvent.setType(Facade.EVENT_TYPE_GROUP);
-        sendEventToGroup(publisherEvent);
+        sendEventToGroup(new PublisherEvent(targetGroup, body, args));
     }
     private void sendEventToGroup(IPublisherEvent publisherEvent) {
-        for (ListenerContext listenerContext : _registeredListeners.values()) {
-            if (listenerContext.getListenerGroupName().equals(publisherEvent.getGroupName())) {
-                System.out.println("sendEventToGroup: " + listenerContext.getListenerRegName());
-                listenerContext.getListener().listenerHandler(publisherEvent);
+        publisherEvent.setType(Facade.EVENT_TYPE_GROUP);
+        for (SubscriberContext subscriberContext : _registeredSubscribers.values()) {
+            if (subscriberContext.getSubscriberGroupName().equals(publisherEvent.getGroupName())) {
+                System.out.println("sendEventToGroup: " + subscriberContext.getSubscriberPrivateName());
+                subscriberContext.getSubscriberInstance().listenerHandler(publisherEvent);
             }
         }
     }
 
     private void sendBroadcastEvent(IPublisherEvent publisherEvent) {
-        for (ListenerContext listenerContext : _registeredListeners.values()) {
-            System.out.println("sendBroadcastEvent: " + listenerContext.getListenerRegName());
-            listenerContext.getListener().listenerHandler(publisherEvent);
+        publisherEvent.setType(Facade.EVENT_TYPE_BROADCAST);
+        for (SubscriberContext subscriberContext : _registeredSubscribers.values()) {
+            System.out.println("sendBroadcastEvent: " + subscriberContext.getSubscriberPrivateName());
+            subscriberContext.getSubscriberInstance().listenerHandler(publisherEvent);
         }
     }
 
