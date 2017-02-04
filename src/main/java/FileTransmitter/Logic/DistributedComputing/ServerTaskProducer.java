@@ -74,7 +74,6 @@ public class ServerTaskProducer implements ISubscriber {
         if (_registeredClients.containsKey(ClientID)) {
             messageLog("[ServerTaskProducer] client " + ClientID + " already registered");
 //            rerun
-
             return;
         }
         messageLog("[ServerTaskProducer] Register new client: " + ClientID);
@@ -118,7 +117,8 @@ public class ServerTaskProducer implements ISubscriber {
                 Facade.CMD_TASK_PRODUCER_START,
                 Facade.CMD_TASK_PRODUCER_REGISTER_EXECUTOR,
                 Facade.CMD_TASK_PRODUCER_GET_NEW_TASK,
-                Facade.CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK
+                Facade.CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK,
+                Facade.CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN
         };
     }
 
@@ -149,6 +149,10 @@ public class ServerTaskProducer implements ISubscriber {
                 collectCompletedTasks((RemoteTaskEntity) publisherEvent.getBody());
                 break;
             }
+            case Facade.CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN: {
+                restoreUncompletedTasks((String) publisherEvent.getBody());
+                break;
+            }
 
         }
     }
@@ -164,6 +168,28 @@ public class ServerTaskProducer implements ISubscriber {
     private void sendTasktoClient(String ClientID, IRemoteTaskEntity task) {
         Publisher.getInstance().sendTransitionEvent(new PublisherEvent(
                 Facade.CMD_TASK_EXECUTOR_ADD_NEW_TASK, task), ClientID);
+    }
+
+    private void restoreUncompletedTasks(String Client_ID) {
+        if (!_registeredClients.keySet().contains(Client_ID)) {
+            messageLog("[ServerTaskProducer] Client (" + Client_ID + ") is not registered!");
+            return;
+        }
+
+        List<IRemoteTaskEntity> clientTasks = new ArrayList<>(_registeredClients.get(Client_ID));
+        _registeredClients.remove(Client_ID);
+
+        for (IRemoteTaskEntity clientTask : clientTasks) {
+            try {
+                _preparedTaskQueue.put((RemoteTaskEntity) clientTask);
+            } catch (InterruptedException e) {
+                toLog("[ServerTaskProducer] restoreUncompletedTasks: InterruptedException");
+            }
+        }
+
+        messageLog("[ServerTaskProducer] " + clientTasks.size()
+                + " uncompleted tasks for client (" + Client_ID
+                + ") restored. Client unregistered.");
     }
 
     private class TasksAllocator implements Runnable {

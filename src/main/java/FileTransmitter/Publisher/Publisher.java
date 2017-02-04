@@ -75,16 +75,25 @@ public final class Publisher {
     }
     public boolean registerRemoteUser(ISubscriber remoteUserHandler, String User_ID, String userGroup) {
         if (_registeredRemoteUsers.containsKey(User_ID)) {
+            System.err.println("User (" + User_ID + ") already registered!");
             return false;
         }
 
         SubscriberContext context = new SubscriberContext(remoteUserHandler, userGroup);
         context.setSubscriberPrivateName(User_ID);
         _registeredRemoteUsers.put(User_ID, context);
+//        System.err.println("User (" + User_ID + ") registered!");
         return true;
     }
 
-
+    public void unregisterRemoteUser(String User_ID) {
+        if (!_registeredRemoteUsers.containsKey(User_ID)) {
+            System.err.println("User (" + User_ID + ") is not registered!");
+            return;
+        }
+        _registeredRemoteUsers.remove(User_ID);
+//        System.err.println("[Publisher] User (" + User_ID + ") unregistered!");
+    }
 
     public boolean removeListaner(ISubscriber subscriber) {
         boolean success = false;
@@ -195,10 +204,10 @@ public final class Publisher {
     public void sendTransitionEvent(IPublisherEvent publisherEvent) {
         sendTransitionEvent(publisherEvent, null, null);
     }
-    public void sendTransitionEvent(IPublisherEvent publisherEvent, String ClientID) {
-        sendTransitionEvent(publisherEvent, ClientID, null);
+    public void sendTransitionEvent(IPublisherEvent publisherEvent, String targetClientID) {
+        sendTransitionEvent(publisherEvent, targetClientID, null);
     }
-    public void sendTransitionEvent(IPublisherEvent publisherEvent, String ClientID, String groupName) {
+    public void sendTransitionEvent(IPublisherEvent publisherEvent, String targetClientID, String groupName) {
         publisherEvent.setServerCommand(Facade.SERVER_TRANSITION_EVENT);
         if (groupName != null) {
             for (SubscriberContext remoteClientsContext : _registeredRemoteUsers.values()) {
@@ -209,10 +218,10 @@ public final class Publisher {
             }
             return;
         }
-        if (ClientID != null) {
+        if (targetClientID != null) {
             for (SubscriberContext remoteClientsContext : _registeredRemoteUsers.values()) {
-                if (remoteClientsContext.getSubscriberPrivateName().equals(ClientID)) {
-                    System.out.println("Send Transition Event to Clients Group: " + remoteClientsContext.getSubscriberPrivateName());
+                if (remoteClientsContext.getSubscriberPrivateName().equals(targetClientID)) {
+                    System.out.println("Send Transition Event to private client: " + remoteClientsContext.getSubscriberPrivateName());
                     remoteClientsContext.getSubscriberInstance().listenerHandler(publisherEvent);
                 }
             }

@@ -6,16 +6,17 @@ import FileTransmitter.Logic.Network.FileClient;
 import FileTransmitter.Logic.Network.NetworkServer;
 import FileTransmitter.Logic.Workers.LogFileWorker;
 import FileTransmitter.Publisher.Publisher;
+import FileTransmitter.Publisher.SubscriberContext;
 import FileTransmitter.ServerStarter;
 import FileTransmitter.Logic.Workers.FileProcessingThread;
+import org.apache.commons.collections.iterators.EntrySetMapIterator;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.concurrent.*;
 
 public class ModeSelector {
@@ -32,6 +33,9 @@ public class ModeSelector {
     }
 
     public void start() {
+
+
+//        if (true) return;
 
         boolean isSelected = false;
 

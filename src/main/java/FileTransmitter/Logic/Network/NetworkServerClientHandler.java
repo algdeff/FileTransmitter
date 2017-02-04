@@ -46,7 +46,11 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
     }
 
     private void clientShutdown() {
+        if (!_sessionActive) {
+            return;
+        }
         _sessionActive = false;
+
         try {
             _objectOutputStream.flush();
 //            _objectOutputStream.close();
@@ -54,9 +58,14 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
             _serverSocketChanhel.shutdownInput();
             _serverSocketChanhel.close();
         } catch (IOException e) {
-            messageLog("CLIENT SHUTDOWN...");
+            toLog("Client shutdown...IOException");
+        } finally {
+            messageLog("CLIENT (" + _clientID + ") SHUTDOWN...");
+            Publisher.getInstance().unregisterRemoteUser(_clientID);
+            Publisher.getInstance().sendPublisherEvent(Facade.CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN, _clientID);
+            _clientHandlerThreads.interrupt();
         }
-        _clientHandlerThreads.interrupt();
+
 //            ThreadPoolManager.getInstance().shutdownRunnableTasks();
     }
 
@@ -215,7 +224,7 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
                 }
 
             } catch (InterruptedException | IOException e) {
-                messageLog("Output stream break!");
+                toLog("Output stream break!");
                 clientShutdown();
             }
 

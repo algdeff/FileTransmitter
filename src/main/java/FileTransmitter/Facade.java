@@ -44,6 +44,7 @@ public final class Facade {
                       CMD_TASK_PRODUCER_GET_NEW_TASK  =  "cmd_task_producer_get_new_task",
 
 //           CMD_SERVER_INTERNAL_SEND_TRANSITION_EVENT  =  "cmd_server_internal_send_transition_event",
+                 CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN  = "cmd_server_internal_client_shutdown",
 
                                 SERVER_SET_CLIENT_ID  =  "cmd_server_set_client_id",
                                SERVER_GET_FILES_LIST  =  "cmd_server_get_files_list",
