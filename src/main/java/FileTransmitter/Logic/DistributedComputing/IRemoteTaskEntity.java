@@ -4,16 +4,16 @@ import java.util.concurrent.Callable;
 
 public interface IRemoteTaskEntity {
 
-    public void setTaskName(String taskName);
-    public String getTaskName();
+    void setTaskName(String taskName);
+    String getTaskName();
 
-    public void setAssignedClientName(String assignedClientName);
-    public String getAssignedClientName();
+    void setAssignedClientName(String assignedClientName);
+    String getAssignedClientName();
 
-    public void setTaskUnit(Callable<Object> taskUnit);
-    public Callable<Object> getTaskUnit();
+    void setTaskUnit(Callable<Object> taskUnit);
+    Callable<Object> getTaskUnit();
 
-    public void setCompletedTaskResult(Object result);
-    public Object getCompletedTaskResult();
+    void setCompletedTaskResult(Object result);
+    Object getCompletedTaskResult();
 
 }

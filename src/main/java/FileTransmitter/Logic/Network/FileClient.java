@@ -30,7 +30,7 @@ public class FileClient implements ISubscriber {
 
     private boolean uiActive = true;
 
-    private ThreadGroup _clientWorkersThreads;
+    private ThreadGroup _clientControllerThreads;
 
     private String _remoteServerUrl;
     private int _remoteServerPort;
@@ -50,6 +50,7 @@ public class FileClient implements ISubscriber {
         _receivedPath = ConfigManager.getReceivedPath();
         _outcomingPath = ConfigManager.getOutcomingPath();
         _sentPath = ConfigManager.getSentPath();
+        _clientControllerThreads = new ThreadGroup("clientControllerThreads");
         _outcomeEventsToServerQueue = new LinkedBlockingQueue<>(50);
         _serverFileListCache = new ArrayList<>();
         _clientFileListCache = new ArrayList<>();
@@ -105,6 +106,20 @@ public class FileClient implements ISubscriber {
 //            clientSocketChannel.close();
         } catch (IOException e) {
             messageLog("Server breakdown!");
+            clientShutdown();
+        }
+
+    }
+
+    private void clientShutdown() {
+
+        try {
+            _objectOutputStream.flush();
+            _objectOutputStream.close();
+        } catch (IOException e) {
+            toLog("Client shutdown...IOException");
+        } finally {
+            messageLog("CLIENT (" + _clientID + ") SHUTDOWN...");
         }
 
     }
@@ -412,7 +427,7 @@ public class FileClient implements ISubscriber {
 
     private void initOutcomeEventsToServerQueue() {
 
-        Thread outcomeQueueThread = new Thread(_clientWorkersThreads, () -> {
+        Thread outcomeQueueThread = new Thread(_clientControllerThreads, () -> {
             OutputStream outputStream = Channels.newOutputStream(_clientSocketChannel);
             try {
                 _objectOutputStream = new ObjectOutputStream(outputStream);
@@ -424,6 +439,8 @@ public class FileClient implements ISubscriber {
 
             } catch (InterruptedException | IOException e) {
                 messageLog("Output stream break!");
+            } finally {
+                clientShutdown();
             }
 
         }, "outcomeEventsToServerQueue");

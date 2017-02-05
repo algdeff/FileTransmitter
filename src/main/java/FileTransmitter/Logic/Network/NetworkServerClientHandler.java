@@ -25,7 +25,7 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
     private String _clientID;
 
-    private boolean _sessionActive = true;
+    private volatile boolean _sessionActive = true;
 
     private ThreadGroup _clientHandlerThreads;
 
@@ -43,30 +43,6 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         _sentPath = ConfigManager.getSentPath();
         _clientHandlerThreads = new ThreadGroup("clientHandlerThreads");
         _outcomeEventsToClientQueue = new LinkedBlockingQueue<>(50);
-    }
-
-    private void clientShutdown() {
-        if (!_sessionActive) {
-            return;
-        }
-        _sessionActive = false;
-
-        try {
-            _objectOutputStream.flush();
-//            _objectOutputStream.close();
-            _serverSocketChanhel.shutdownOutput();
-            _serverSocketChanhel.shutdownInput();
-            _serverSocketChanhel.close();
-        } catch (IOException e) {
-            toLog("Client shutdown...IOException");
-        } finally {
-            messageLog("CLIENT (" + _clientID + ") SHUTDOWN...");
-            Publisher.getInstance().unregisterRemoteUser(_clientID);
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN, _clientID);
-            _clientHandlerThreads.interrupt();
-        }
-
-//            ThreadPoolManager.getInstance().shutdownRunnableTasks();
     }
 
     @Override
@@ -118,11 +94,36 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         } catch (ClassNotFoundException e) {
             toLog(e.getMessage());
         } catch (IOException e) {
-            clientShutdown();
             messageLog("Client ("+ clientAddress +") is breakdown!");
+        } finally {
+            clientShutdown();
         }
 
         //System.out.println("Client terminated " + clientAddress.toString());
+    }
+
+    private void clientShutdown() {
+        if (!_sessionActive) {
+            return;
+        }
+        _sessionActive = false;
+
+        try {
+            _objectOutputStream.flush();
+//            _objectOutputStream.close();
+            _serverSocketChanhel.shutdownOutput();
+            _serverSocketChanhel.shutdownInput();
+            _serverSocketChanhel.close();
+        } catch (IOException e) {
+            toLog("Client shutdown...IOException");
+        } finally {
+            messageLog("CLIENT (" + _clientID + ") SHUTDOWN...");
+            Publisher.getInstance().unregisterRemoteUser(_clientID);
+            Publisher.getInstance().sendPublisherEvent(Facade.CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN, _clientID);
+            _clientHandlerThreads.interrupt();
+        }
+
+//            ThreadPoolManager.getInstance().shutdownRunnableTasks();
     }
 
     private void parseCommandFromClient(PublisherEvent eventFromClient) {
@@ -158,12 +159,35 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
     }
 
-    private void sendEventToClient(PublisherEvent publisherEvent) {  //synchronyzed if no queue
+    private void sendEventToClient(PublisherEvent publisherEvent) {  //synchronized if no queue
         try {
             _outcomeEventsToClientQueue.put(publisherEvent);
         } catch (InterruptedException e) {
             toLog(e.getMessage());
         }
+
+    }
+
+    private void initOutcomeEventsToClientQueue() {
+        Thread outcomeQueueThread = new Thread(_clientHandlerThreads, () -> {
+            OutputStream outputStream = Channels.newOutputStream(_serverSocketChanhel);
+            try {
+                _objectOutputStream = new ObjectOutputStream(outputStream);
+
+                while (_sessionActive) {
+                    PublisherEvent publisherEvent = _outcomeEventsToClientQueue.take();
+                    _objectOutputStream.writeObject(publisherEvent);
+                }
+
+            } catch (InterruptedException | IOException e) {
+                toLog("Output stream break!");
+            } finally {
+                clientShutdown();
+            }
+
+        }, "outcomeEventsToClientQueue");
+        outcomeQueueThread.start();
+//        ThreadPoolManager.getInstance().addRunnableTask(_outcomeQueueThread);
 
     }
 
@@ -208,50 +232,6 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         sendEventToClient(eventToServer);
 
     }
-
-
-
-
-    private void initOutcomeEventsToClientQueue() {
-        Thread outcomeQueueThread = new Thread(_clientHandlerThreads, () -> {
-            OutputStream outputStream = Channels.newOutputStream(_serverSocketChanhel);
-            try {
-                _objectOutputStream = new ObjectOutputStream(outputStream);
-
-                while (_sessionActive) {
-                    PublisherEvent publisherEvent = _outcomeEventsToClientQueue.take();
-                    _objectOutputStream.writeObject(publisherEvent);
-                }
-
-            } catch (InterruptedException | IOException e) {
-                toLog("Output stream break!");
-                clientShutdown();
-            }
-
-        }, "outcomeEventsToClientQueue");
-        outcomeQueueThread.start();
-//        ThreadPoolManager.getInstance().addRunnableTask(_outcomeQueueThread);
-
-    }
-
-//    private void initTransitionEventSender() {
-//        Thread senderThread = new Thread(_clientHandlerThreads, () -> {
-//            try {
-//                while (_sessionActive) {
-//                    PublisherEvent outcomeTransitionEvent = Publisher.getInstance().getTransitionEvent();
-//                    outcomeTransitionEvent.setServerCommand(Facade.SERVER_TRANSITION_EVENT);
-//                    sendEventToClient(outcomeTransitionEvent);
-//                    System.out.println("outcomeTransitionEvent send");
-//
-//                }
-//            } catch (Exception e) {
-//                messageLog("TE break!");
-//            }
-//        }, "initTransitionEventSenderThread");
-//        senderThread.start();
-////        ThreadPoolManager.getInstance().addRunnableTask(_transitionEventSenderThread);
-//
-//    }
 
     private List<String> getServerOutcommingPathContent() {
         List<String> fileList = new ArrayList<>();
