@@ -1,15 +1,15 @@
-package FileTransmitter;
+package Transmitter;
 
-import FileTransmitter.Logic.*;
-import FileTransmitter.Logic.DistributedComputing.ClientTaskExecutor;
-import FileTransmitter.Logic.DistributedComputing.ServerTaskProducer;
-import FileTransmitter.Logic.ModeSelector;
-import FileTransmitter.Logic.Workers.LogFileWorker;
-import FileTransmitter.Publisher.Publisher;
+import Transmitter.Logic.*;
+import Transmitter.Logic.DistributedComputing.ClientTaskExecutor;
+import Transmitter.Logic.DistributedComputing.ServerTaskProducer;
+import Transmitter.Logic.ModeSelector;
+import Transmitter.Logic.Workers.LogFileWorker;
+import Transmitter.Publisher.Publisher;
 
 public class ServerStarter {
 
-    private static String _serverName = "FileTransmitter";
+    private static String _serverName = "Transmitter";
     private static ServerStarter _instance;
 
     private ModeSelector _process;

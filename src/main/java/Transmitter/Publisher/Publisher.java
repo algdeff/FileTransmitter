@@ -1,8 +1,8 @@
-package FileTransmitter.Publisher;
+package Transmitter.Publisher;
 
-import FileTransmitter.Facade;
-import FileTransmitter.Publisher.Interfaces.ISubscriber;
-import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
+import Transmitter.Facade;
+import Transmitter.Publisher.Interfaces.ISubscriber;
+import Transmitter.Publisher.Interfaces.IPublisherEvent;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

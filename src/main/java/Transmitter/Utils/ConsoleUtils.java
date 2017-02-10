@@ -1,4 +1,4 @@
-package FileTransmitter.Utils;
+package Transmitter.Utils;
 
 import java.io.Console;
 import java.io.PrintWriter;

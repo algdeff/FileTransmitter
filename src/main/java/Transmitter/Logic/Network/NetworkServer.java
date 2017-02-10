@@ -1,20 +1,12 @@
-package FileTransmitter.Logic.Network;
+package Transmitter.Logic.Network;
 
-import FileTransmitter.Facade;
-import FileTransmitter.Logic.ConfigManager;
-import FileTransmitter.Publisher.Publisher;
-import FileTransmitter.Publisher.PublisherEvent;
-import FileTransmitter.ServerStarter;
+import Transmitter.Facade;
+import Transmitter.Publisher.Publisher;
+import Transmitter.ServerStarter;
 
 import java.io.*;
 import java.net.*;
 import java.nio.channels.*;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.*;
 
 public class NetworkServer {

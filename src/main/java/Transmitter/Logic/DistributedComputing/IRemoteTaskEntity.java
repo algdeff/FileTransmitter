@@ -1,4 +1,4 @@
-package FileTransmitter.Logic.DistributedComputing;
+package Transmitter.Logic.DistributedComputing;
 
 import java.util.concurrent.Callable;
 

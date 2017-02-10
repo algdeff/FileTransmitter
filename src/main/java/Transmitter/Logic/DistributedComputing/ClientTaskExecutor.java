@@ -1,12 +1,11 @@
-package FileTransmitter.Logic.DistributedComputing;
+package Transmitter.Logic.DistributedComputing;
 
-import FileTransmitter.Facade;
-import FileTransmitter.Logic.DistributedComputing.RemoteTaskEntity;
-import FileTransmitter.Logic.ThreadPoolManager;
-import FileTransmitter.Publisher.Interfaces.ISubscriber;
-import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
-import FileTransmitter.Publisher.Publisher;
-import FileTransmitter.Publisher.PublisherEvent;
+import Transmitter.Facade;
+import Transmitter.Logic.ThreadPoolManager;
+import Transmitter.Publisher.Interfaces.ISubscriber;
+import Transmitter.Publisher.Interfaces.IPublisherEvent;
+import Transmitter.Publisher.Publisher;
+import Transmitter.Publisher.PublisherEvent;
 
 import java.util.concurrent.*;
 

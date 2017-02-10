@@ -1,6 +1,6 @@
-package FileTransmitter.Logic;
+package Transmitter.Logic;
 
-import FileTransmitter.ServerStarter;
+import Transmitter.ServerStarter;
 import org.apache.commons.configuration2.XMLConfiguration;
 import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
@@ -16,10 +16,10 @@ public final class ConfigManager {
      ConfigManager
 
      Property keys from config file
-     default: filetransmitter.conf.xml
+     default: transmitter.conf.xml
      */
 
-    private static final String           CONFIG_FILE_PATH  = "filetransmitter.conf.xml",
+    private static final String           CONFIG_FILE_PATH  =  "transmitter.conf.xml",
 
                                          REMOTE_SERVER_URL  =  "remote_server_url",
                                         REMOTE_SERVER_PORT  =  "remote_server_port",

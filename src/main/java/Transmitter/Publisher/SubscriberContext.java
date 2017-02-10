@@ -1,6 +1,6 @@
-package FileTransmitter.Publisher;
+package Transmitter.Publisher;
 
-import FileTransmitter.Publisher.Interfaces.ISubscriber;
+import Transmitter.Publisher.Interfaces.ISubscriber;
 
 import java.util.ArrayList;
 import java.util.Arrays;

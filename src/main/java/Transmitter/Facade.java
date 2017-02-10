@@ -1,4 +1,4 @@
-package FileTransmitter;
+package Transmitter;
 
 public final class Facade {
 

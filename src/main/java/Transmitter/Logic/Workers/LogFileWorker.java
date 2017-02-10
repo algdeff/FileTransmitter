@@ -1,11 +1,11 @@
-package FileTransmitter.Logic.Workers;
+package Transmitter.Logic.Workers;
 
-import FileTransmitter.Facade;
-import FileTransmitter.Logic.ConfigManager;
-import FileTransmitter.Publisher.Interfaces.ISubscriber;
-import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
-import FileTransmitter.Publisher.Publisher;
-import FileTransmitter.ServerStarter;
+import Transmitter.Facade;
+import Transmitter.Logic.ConfigManager;
+import Transmitter.Publisher.Interfaces.ISubscriber;
+import Transmitter.Publisher.Interfaces.IPublisherEvent;
+import Transmitter.Publisher.Publisher;
+import Transmitter.ServerStarter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

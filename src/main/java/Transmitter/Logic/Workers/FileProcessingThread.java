@@ -1,17 +1,10 @@
-package FileTransmitter.Logic.Workers;
+package Transmitter.Logic.Workers;
 
-import FileTransmitter.Logic.ConfigManager;
+import Transmitter.Logic.ConfigManager;
 
 import java.io.IOException;
 import java.nio.file.*;
-import java.sql.Date;
-import java.sql.Timestamp;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.Callable;
 
 public class FileProcessingThread implements Callable {

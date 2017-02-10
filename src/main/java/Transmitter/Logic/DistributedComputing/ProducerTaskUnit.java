@@ -1,9 +1,7 @@
-package FileTransmitter.Logic.DistributedComputing;
+package Transmitter.Logic.DistributedComputing;
 
 import java.io.Serializable;
-import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;

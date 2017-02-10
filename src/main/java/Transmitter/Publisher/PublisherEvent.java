@@ -1,7 +1,7 @@
-package FileTransmitter.Publisher;
+package Transmitter.Publisher;
 
-import FileTransmitter.Facade;
-import FileTransmitter.Publisher.Interfaces.IPublisherEvent;
+import Transmitter.Facade;
+import Transmitter.Publisher.Interfaces.IPublisherEvent;
 
 import java.io.Serializable;
 

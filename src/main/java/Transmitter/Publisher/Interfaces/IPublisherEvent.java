@@ -1,4 +1,4 @@
-package FileTransmitter.Publisher.Interfaces;
+package Transmitter.Publisher.Interfaces;
 
 public interface IPublisherEvent {
 
