@@ -12,8 +12,10 @@
     <sent_path>_sent</sent_path>
     <!--путь и имя LOG файла-->
     <log_file_path_name>result.log</log_file_path_name>
+    <!--интервал записи статистики скаченых файлов-->
+    <stat_write_interval_sec>10</stat_write_interval_sec>
     <!--макс. количество параллельных потоков-->
     <thread_pool_size>50</thread_pool_size>
     <!--маски автоматически отправляемых файлов-->
-    <outcoming_file_type_glob>*.{zip,txt,xml,exe,doc}</outcoming_file_type_glob>
+    <outcoming_file_type_glob>*.{zip,txt,xml,exe,doc,jpg}</outcoming_file_type_glob>
 </xmlmonitor-configuration>

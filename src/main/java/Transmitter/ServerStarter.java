@@ -1,5 +1,6 @@
 package Transmitter;
 
+import static Transmitter.Facade.*;
 import Transmitter.Logic.*;
 import Transmitter.Logic.DistributedComputing.ClientTaskExecutor;
 import Transmitter.Logic.DistributedComputing.ServerTaskProducer;
@@ -26,7 +27,7 @@ public class ServerStarter {
             _instance.start();
 
         } catch (Throwable ex) {
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG,
+            Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG,
                     "Failed start server:" + ex.getMessage());
             ex.printStackTrace(System.err);
             stopServerInstance();
@@ -43,14 +44,11 @@ public class ServerStarter {
 
     private void start() {
 
-
-
-
         Facade.getInstance().init();
         ConfigManager.init();
-        LogFileWorker.getInstance().init();
         ThreadPoolManager.getInstance()
                 .init(ConfigManager.getThreadPoolSize());
+        LogFileWorker.getInstance().init();
 
         ServerTaskProducer serverTaskProducer = new ServerTaskProducer();
         serverTaskProducer.init();
@@ -65,7 +63,7 @@ public class ServerStarter {
 
     private void stop() {
 
-        Publisher.getInstance().sendPublisherEvent(Facade.SERVER_TERMINATE);
+        Publisher.getInstance().sendPublisherEvent(SERVER_TERMINATE);
         System.err.println("Server STOP");
     }
 

@@ -28,6 +28,7 @@ public final class ConfigManager {
                                                  SENT_PATH  =  "sent_path",
                                              LOG_FILE_PATH  =  "log_file_path_name",
                                           THREAD_POOL_SIZE  =  "thread_pool_size",
+                                       STATS_WRITE_INTERVAL  =  "stat_write_interval_sec",
                                       OUTCOMING_TYPES_GLOB  =  "outcoming_file_type_glob";
 
     private static final ConcurrentHashMap<String, String> _properties;
@@ -79,6 +80,10 @@ public final class ConfigManager {
 
     public static Path getLogFilePath() {
         return Paths.get(_properties.get(LOG_FILE_PATH));
+    }
+
+    public static int getStatsWriteInterval() {
+        return Integer.parseInt(_properties.get(STATS_WRITE_INTERVAL));
     }
 
     public static int getThreadPoolSize() {

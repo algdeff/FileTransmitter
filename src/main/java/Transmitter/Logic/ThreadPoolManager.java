@@ -1,6 +1,6 @@
 package Transmitter.Logic;
 
-import Transmitter.Facade;
+import static Transmitter.Facade.*;
 import Transmitter.Publisher.Interfaces.ISubscriber;
 import Transmitter.Publisher.Interfaces.IPublisherEvent;
 import Transmitter.Publisher.Publisher;
@@ -153,18 +153,9 @@ public final class ThreadPoolManager implements ISubscriber {
         return _futureTasksQueue.poll();
     }
 
-    public void sheduledTask(Runnable task, int interval) {
-
-        //_scheduler.scheduleAtFixedRate(task, 0, interval, SECONDS);
-        _scheduler.schedule(task, interval, SECONDS);
-
-//        final Runnable beeper = new Runnable() {
-//            public void run() { System.out.println("beep"); }
-//        };
-//        final ScheduledFuture<?> beeperHandle = _scheduler.scheduleAtFixedRate(beeper, 2, 2, SECONDS);
-//        _scheduler.schedule(new Runnable() {
-//            public void run() { beeperHandle.cancel(true); }
-//        }, 10, SECONDS);
+    public void scheduledTask(Runnable task, int intervalSec) {
+        _scheduler.scheduleAtFixedRate(task, intervalSec, intervalSec, SECONDS);
+//        _scheduler.schedule(task, intervalSec, SECONDS);
     }
 
     public int getFutureTasksQueueSize() {
@@ -174,7 +165,6 @@ public final class ThreadPoolManager implements ISubscriber {
     public void shutdown() {
 
     }
-
 
 
     private class PoolWorker extends Thread {
@@ -205,55 +195,56 @@ public final class ThreadPoolManager implements ISubscriber {
     }
 
     private void messageLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
+        System.out.println(message);
+        //Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
     }
 
     private void toLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_RECORD, message);
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_RECORD, message);
     }
 
     @Override
     public void registerOnPublisher() {
-        Publisher.getInstance().registerNewSubscriber(this, Facade.EVENT_GROUP_EXECUTOR);
+        Publisher.getInstance().registerNewSubscriber(this, EVENT_GROUP_EXECUTOR);
     }
 
     @Override
     public String[] subscriberInterests() {
         return new String[] {
-                Facade.CMD_EXECUTOR_PUT_TASK,
-                Facade.CMD_EXECUTOR_TAKE_TASK,
-                Facade.CMD_EXECUTOR_DEMO
+                CMD_EXECUTOR_PUT_TASK,
+                CMD_EXECUTOR_TAKE_TASK,
+                CMD_EXECUTOR_DEMO
         };
     }
 
     @Override
     public void listenerHandler(IPublisherEvent publisherEvent) {
-        if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
+        if (publisherEvent.getType().equals(EVENT_TYPE_GROUP)) {
             messageLog("Executor received group event ("
                     + publisherEvent.getInterestName() + "): \n" + publisherEvent.getBody().toString());
         }
 
         switch (publisherEvent.getInterestName()) {
-            case Facade.CMD_EXECUTOR_PUT_TASK: {
+            case CMD_EXECUTOR_PUT_TASK: {
 
-                PublisherEvent transitionEvent = new PublisherEvent(Facade.CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
+                PublisherEvent transitionEvent = new PublisherEvent(CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
                 Publisher.getInstance().sendTransitionEvent(transitionEvent);
                 break;
             }
 
-            case Facade.CMD_EXECUTOR_TAKE_TASK: {
+            case CMD_EXECUTOR_TAKE_TASK: {
                 messageLog("EXECUTOR_TAKE_TASK" + publisherEvent.getBody());
                 break;
             }
 
-            case Facade.CMD_EXECUTOR_DEMO: {
+            case CMD_EXECUTOR_DEMO: {
                 messageLog("[EXECUTOR] command received on CMD_EXECUTOR_DEMO, body: "
                         + publisherEvent.getBody() + "\nEXECUTOR: sendTransitionEvent to "
                         + "remote LOGGER_ADD_LOG, contains THIS MESSAGE");
                 //work......
 
-                PublisherEvent transitionEvent = new PublisherEvent(Facade.CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
-                Publisher.getInstance().sendTransitionEvent(transitionEvent, null, Facade.TRANSITION_EVENT_GROUP_ALL_USERS);
+                PublisherEvent transitionEvent = new PublisherEvent(CMD_LOGGER_ADD_LOG, "THIS MESSAGE from REMOTE EXECUTOR");
+                Publisher.getInstance().sendTransitionEvent(transitionEvent, null, TRANSITION_EVENT_GROUP_ALL_USERS);
                 break;
             }
 

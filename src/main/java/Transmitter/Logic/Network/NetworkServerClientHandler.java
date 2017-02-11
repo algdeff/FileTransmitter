@@ -1,6 +1,6 @@
 package Transmitter.Logic.Network;
 
-import Transmitter.Facade;
+import static Transmitter.Facade.*;
 import Transmitter.Logic.ConfigManager;
 import Transmitter.Publisher.Interfaces.ISubscriber;
 import Transmitter.Publisher.Interfaces.IPublisherEvent;
@@ -63,7 +63,7 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 //                initTransitionEventSender();
                 registerOnPublisher();
 
-                sendEventToClient(new PublisherEvent(Facade.SERVER_SET_CLIENT_ID, _clientID).toServerCommand());
+                sendEventToClient(new PublisherEvent(SERVER_SET_CLIENT_ID, _clientID).toServerCommand());
 
                 while (_sessionActive) {
                     Object receivedObject = _objectInputStream.readObject();
@@ -79,7 +79,7 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
                         continue;
                     }
 
-                    if (eventFromClient.getServerCommand().equals(Facade.SERVER_TERMINATE)) {
+                    if (eventFromClient.getServerCommand().equals(SERVER_TERMINATE)) {
                         messageLog("CMD_SERVER_TERMINATE");
                         //clientSocket.close();
                         break;
@@ -119,7 +119,7 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         } finally {
             messageLog("CLIENT (" + _clientID + ") SHUTDOWN...");
             Publisher.getInstance().unregisterRemoteUser(_clientID);
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN, _clientID);
+            Publisher.getInstance().sendPublisherEvent(CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN, _clientID);
             _clientHandlerThreads.interrupt();
         }
 
@@ -129,22 +129,22 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
     private void parseCommandFromClient(PublisherEvent eventFromClient) {
 
         switch (eventFromClient.getServerCommand()) {
-            case Facade.SERVER_ADD_FILES: {
+            case SERVER_ADD_FILES: {
 //                System.err.println("Command: " + command);
-                saveClientFileToReceivedFolder(eventFromClient);
+                saveClientFileToReceivedFolder((FileContext) eventFromClient.getBody());
                 return;
             }
-            case Facade.SERVER_GET_FILES: {
+            case SERVER_GET_FILES: {
 //                System.err.println("Command: " + command);
-                sendServerFileToClient((String) eventFromClient.getBody());
+                sendSelectedServerFilesToClient((List<FileContext>) eventFromClient.getBody());
                 return;
             }
-            case Facade.SERVER_GET_FILES_LIST: {
+            case SERVER_GET_FILES_LIST: {
 //                System.err.println("Command: " + command);
                 sendServerFileListToClient();
                 return;
             }
-            case Facade.SERVER_TRANSITION_EVENT: {
+            case SERVER_TRANSITION_EVENT: {
                 publishTransitionEventFromClient(eventFromClient);
                 return;
             }
@@ -191,25 +191,39 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
     }
 
-    private void saveClientFileToReceivedFolder(PublisherEvent eventFromClient) {
-        Path filename = Paths.get(_receivedPath.toString(), (String) eventFromClient.getArgs()[0]);
-        System.out.println(filename.toString() + " @@@ " + (long) eventFromClient.getArgs()[1]);
+    private void saveClientFileToReceivedFolder(FileContext fileContext) {
+        Path filename = Paths.get(_receivedPath.toString(), fileContext.getFileName());
 
-        byte[] fileContent = (byte[]) eventFromClient.getBody();
-
-//        System.out.println("+++" + fileContent.length);
+        byte[] fileContent = fileContext.getFileContent();
+//            System.out.println("+++" + fileContent.length);
 
         try {
             Files.write(filename, fileContent, StandardOpenOption.CREATE);
         } catch (IOException e) {
-            messageLog(e.getMessage());
+            e.printStackTrace();
             ServerStarter.stopAndExit(1);
         }
 
+        sendMessageToClient("Received transmission", _clientID);
+        messageLog("Done");
+
     }
 
-    private void sendServerFileToClient(String filename) {
-        Path fileToSend = Paths.get(filename).normalize();
+    private void sendSelectedServerFilesToClient(List<FileContext> selectedFiles) {
+        for (FileContext fileContext : selectedFiles) {
+            sendFileToClient(fileContext);
+        }
+    }
+
+
+    private void sendFileToClient(FileContext fileContext) {
+        Path fileToSend = Paths.get(fileContext.getFileFullPath()).normalize();
+
+        if (!Files.exists(fileToSend)) {
+            sendMessageToClient("(for client " + _clientID + "): File "
+                    + fileToSend.toString() + " is not exist", _clientID);
+            return;
+        }
 
         byte[] fileContent = new byte[0];
         try {
@@ -218,30 +232,38 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
             toLog(e.getMessage());
         }
         long fileSize = fileContent.length;
-//        System.out.println(filename + " " + fileToSend.toString() + " " + fileSize);
 
-        PublisherEvent eventToClient = new PublisherEvent(Facade.SERVER_GET_FILES, fileContent).toServerCommand();
-        eventToClient.setArgs(fileToSend.toString(), fileSize);
+        fileContext.setFileSize(fileSize);
+        fileContext.setFileContent(fileContent);
+
+        sendMessageToClient("Start transmission: " + fileToSend.getFileName().toString()
+                + " @ " + fileSize + " bytes...", _clientID);
+
+        PublisherEvent eventToClient = new PublisherEvent(SERVER_GET_FILES, fileContext).toServerCommand();
         sendEventToClient(eventToClient);
+
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_FILE_TO_STATISTICS, fileToSend.toString());
 
     }
 
     private void sendServerFileListToClient() {
-        PublisherEvent eventToServer = new PublisherEvent(Facade.SERVER_GET_FILES_LIST).toServerCommand();
+        PublisherEvent eventToServer = new PublisherEvent(SERVER_GET_FILES_LIST).toServerCommand();
         eventToServer.setBody(getServerOutcommingPathContent());
         sendEventToClient(eventToServer);
 
     }
 
-    private List<String> getServerOutcommingPathContent() {
-        List<String> fileList = new ArrayList<>();
+    private List<FileContext> getServerOutcommingPathContent() {
+        List<FileContext> fileList = new ArrayList<>();
 
         try {
             DirectoryStream<Path> directoryStream = Files.newDirectoryStream(_outcomingPath, ConfigManager
                     .getOutcomingTypesGlob());
             for (Path file : directoryStream) {
-//                if (!isCorrectFile(file)) continue;
-                fileList.add(file.toString());
+                if (!isCorrectFile(file)) continue;
+                FileContext fileContext = new FileContext(file);
+                fileContext.setFileSize(Files.size(file));
+                fileList.add(fileContext);
             }
 
         } catch (IOException e) {
@@ -253,27 +275,21 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
     private boolean isCorrectFile(Path pathname) {
         if (Files.isSymbolicLink(pathname)
-                || !Files.isWritable(pathname)
+                || !Files.isReadable(pathname)
                 || Files.isDirectory(pathname)) return false;
 
-        PathMatcher pathMatcher = FileSystems.getDefault()
-                .getPathMatcher("glob:" + ConfigManager
-                        .getOutcomingTypesGlob());
+        return true;
 
-        return pathMatcher.matches(pathname.getFileName());
-    }
-
-    private void messageLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
-    }
-
-    private void toLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_RECORD, message);
+//        PathMatcher pathMatcher = FileSystems.getDefault()
+//                .getPathMatcher("glob:" + ConfigManager
+//                        .getOutcomingTypesGlob());
+//
+//        return pathMatcher.matches(pathname.getFileName());
     }
 
     @Override
     public void registerOnPublisher() {
-        Publisher.getInstance().registerRemoteUser(this, _clientID, Facade.TRANSITION_EVENT_GROUP_ALL_USERS);
+        Publisher.getInstance().registerRemoteUser(this, _clientID, TRANSITION_EVENT_GROUP_ALL_USERS);
     }
 
     @Override
@@ -283,11 +299,25 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
     @Override
     public void listenerHandler(IPublisherEvent outcomeTransitionEvent) {
-        if (outcomeTransitionEvent.getServerCommand().equals(Facade.SERVER_TRANSITION_EVENT)) {
+        if (outcomeTransitionEvent.getServerCommand().equals(SERVER_TRANSITION_EVENT)) {
             messageLog("Send transition event to client: " + _clientID);
             sendEventToClient((PublisherEvent) outcomeTransitionEvent);
             return;
         }
 
     }
+
+    private void sendMessageToClient(String message, String ClientID) {
+        Publisher.getInstance().sendTransitionEvent(new PublisherEvent(
+                CMD_LOGGER_CONSOLE_MESSAGE, "[SERVER] " + message), ClientID);
+    }
+
+    private void messageLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_CONSOLE_MESSAGE, message);
+    }
+
+    private void toLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_RECORD, message);
+    }
+
 }

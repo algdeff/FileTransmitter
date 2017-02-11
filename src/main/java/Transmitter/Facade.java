@@ -33,7 +33,10 @@ public final class Facade {
 
                                   CMD_LOGGER_ADD_LOG  =  "cmd_logger_add_log",
                                CMD_LOGGER_ADD_RECORD  =  "cmd_logger_add_record",
+                          CMD_LOGGER_CONSOLE_MESSAGE  =  "cmd_logger_console_message",
+                   CMD_LOGGER_ADD_FILE_TO_STATISTICS  =  "cmd_logger_add_file_to_statistics",
                                 CMD_LOGGER_CLEAR_LOG  =  "cmd_logger_clear_log",
+                                 CMD_LOGGER_SHUTDOWN  =  "cmd_logger_shutdown",
 
                              CMD_TASK_EXECUTOR_START  =  "cmd_task_executor_start",
                       CMD_TASK_EXECUTOR_ADD_NEW_TASK  =  "cmd_task_executor_add_new_task",
@@ -58,6 +61,8 @@ public final class Facade {
     private static volatile Facade _instance;
     private static boolean _inited = false;
 
+    private static boolean _isServerRole = false;
+
     private Facade() {
     }
 
@@ -79,6 +84,14 @@ public final class Facade {
 
 
         _inited = true;
+    }
+
+    public static void setServerRole(boolean isServerRole) {
+        _isServerRole = isServerRole;
+    }
+
+    public static boolean isServerRole() {
+        return _isServerRole;
     }
 
 

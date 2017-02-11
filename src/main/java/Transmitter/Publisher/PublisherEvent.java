@@ -1,6 +1,6 @@
 package Transmitter.Publisher;
 
-import Transmitter.Facade;
+import static Transmitter.Facade.*;
 import Transmitter.Publisher.Interfaces.IPublisherEvent;
 
 import java.io.Serializable;
@@ -27,7 +27,7 @@ public class PublisherEvent implements IPublisherEvent, Serializable {
         _interestName = interestName;
         _body = body;
         _args = (args == null) ? NULL_ARRAY : args;
-        _type = interestName != null ? Facade.EVENT_TYPE_SUBSCRIBE : Facade.EVENT_TYPE_GROUP;
+        _type = interestName != null ? EVENT_TYPE_SUBSCRIBE : EVENT_TYPE_GROUP;
 
         _groupName = "";
         _serverCommand = "";
@@ -88,19 +88,19 @@ public class PublisherEvent implements IPublisherEvent, Serializable {
 
     public PublisherEvent toSubscribeEvent(String interestName) {
         setInterestName(interestName);
-        setType(Facade.EVENT_TYPE_SUBSCRIBE);
+        setType(EVENT_TYPE_SUBSCRIBE);
         return this;
     }
 
     public PublisherEvent toPrivateEvent(String privateSubscriberName) {
-        setType(Facade.EVENT_TYPE_PRIVATE);
+        setType(EVENT_TYPE_PRIVATE);
         setPrivateSubscriberName(privateSubscriberName);
         return this;
 
     }
 
     public PublisherEvent toGroupEvent(String groupName) {
-        setType(Facade.EVENT_TYPE_PRIVATE);
+        setType(EVENT_TYPE_PRIVATE);
         setGroupName(groupName);
         return this;
     }

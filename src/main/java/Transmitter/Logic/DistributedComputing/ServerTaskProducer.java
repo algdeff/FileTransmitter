@@ -1,6 +1,6 @@
 package Transmitter.Logic.DistributedComputing;
 
-import Transmitter.Facade;
+import static Transmitter.Facade.*;
 import Transmitter.Logic.ThreadPoolManager;
 import Transmitter.Publisher.Interfaces.ISubscriber;
 import Transmitter.Publisher.Interfaces.IPublisherEvent;
@@ -105,48 +105,48 @@ public class ServerTaskProducer implements ISubscriber {
 
     @Override
     public void registerOnPublisher() {
-        Publisher.getInstance().registerNewSubscriber(this, Facade.EVENT_GROUP_TASK_PRODUCER, NAME);
+        Publisher.getInstance().registerNewSubscriber(this, EVENT_GROUP_TASK_PRODUCER, NAME);
     }
 
     @Override
     public String[] subscriberInterests() {
         return new String[] {
-                Facade.CMD_TASK_PRODUCER_START,
-                Facade.CMD_TASK_PRODUCER_REGISTER_EXECUTOR,
-                Facade.CMD_TASK_PRODUCER_GET_NEW_TASK,
-                Facade.CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK,
-                Facade.CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN
+                CMD_TASK_PRODUCER_START,
+                CMD_TASK_PRODUCER_REGISTER_EXECUTOR,
+                CMD_TASK_PRODUCER_GET_NEW_TASK,
+                CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK,
+                CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN
         };
     }
 
     @Override
     public void listenerHandler(IPublisherEvent publisherEvent) {
-        if (publisherEvent.getType().equals(Facade.EVENT_TYPE_GROUP)) {
+        if (publisherEvent.getType().equals(EVENT_TYPE_GROUP)) {
             messageLog("TASK_PRODUCER - received group event ("
                     + publisherEvent.getInterestName() + "): \n" + publisherEvent.getBody().toString());
         }
 
         switch (publisherEvent.getInterestName()) {
-            case Facade.CMD_TASK_PRODUCER_START: {
+            case CMD_TASK_PRODUCER_START: {
                 delayedStart();
                 break;
 
             }
-            case Facade.CMD_TASK_PRODUCER_REGISTER_EXECUTOR: {
+            case CMD_TASK_PRODUCER_REGISTER_EXECUTOR: {
                 registerNewExecutor((String) publisherEvent.getBody());
                 break;
 
             }
-            case Facade.CMD_TASK_PRODUCER_GET_NEW_TASK: {
+            case CMD_TASK_PRODUCER_GET_NEW_TASK: {
                 messageLog("CMD_TASK_PRODUCER_GET_NEW_TASK" + publisherEvent.getBody().toString());
                 break;
 
             }
-            case Facade.CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK: {
+            case CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK: {
                 collectCompletedTasks((RemoteTaskEntity) publisherEvent.getBody());
                 break;
             }
-            case Facade.CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN: {
+            case CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN: {
                 restoreUncompletedTasks((String) publisherEvent.getBody());
                 break;
             }
@@ -155,16 +155,16 @@ public class ServerTaskProducer implements ISubscriber {
     }
 
     private void messageLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
     }
 
     private void toLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_RECORD, message);
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_RECORD, message);
     }
 
     private void sendTasktoClient(String ClientID, IRemoteTaskEntity task) {
         Publisher.getInstance().sendTransitionEvent(new PublisherEvent(
-                Facade.CMD_TASK_EXECUTOR_ADD_NEW_TASK, task), ClientID);
+                CMD_TASK_EXECUTOR_ADD_NEW_TASK, task), ClientID);
     }
 
     private void restoreUncompletedTasks(String Client_ID) {

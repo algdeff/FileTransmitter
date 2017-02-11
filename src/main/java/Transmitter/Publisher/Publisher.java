@@ -1,6 +1,6 @@
 package Transmitter.Publisher;
 
-import Transmitter.Facade;
+import static Transmitter.Facade.*;
 import Transmitter.Publisher.Interfaces.ISubscriber;
 import Transmitter.Publisher.Interfaces.IPublisherEvent;
 
@@ -208,7 +208,7 @@ public final class Publisher {
         sendTransitionEvent(publisherEvent, targetClientID, null);
     }
     public void sendTransitionEvent(IPublisherEvent publisherEvent, String targetClientID, String groupName) {
-        publisherEvent.setServerCommand(Facade.SERVER_TRANSITION_EVENT);
+        publisherEvent.setServerCommand(SERVER_TRANSITION_EVENT);
         if (groupName != null) {
             for (SubscriberContext remoteClientsContext : _registeredRemoteUsers.values()) {
                 if (remoteClientsContext.getSubscriberGroupName().equals(groupName)) {
@@ -228,7 +228,7 @@ public final class Publisher {
             return;
         }
         for (SubscriberContext subscriberContext : _registeredSubscribers.values()) {
-            if (subscriberContext.getSubscriberGroupName().equals(Facade.TRANSITION_EVENT_GROUP_CLIENT)) {
+            if (subscriberContext.getSubscriberGroupName().equals(TRANSITION_EVENT_GROUP_CLIENT)) {
                 System.out.println("Send Transition Event to server");
                 subscriberContext.getSubscriberInstance().listenerHandler(publisherEvent);
             }
@@ -258,19 +258,19 @@ public final class Publisher {
 //        System.out.println("SPE"+publisherEvent.getInterestName()+publisherEvent.getType()+publisherEvent.getBody().toString());
 
         switch (publisherEvent.getType()) {
-            case Facade.EVENT_TYPE_SUBSCRIBE: {
+            case EVENT_TYPE_SUBSCRIBE: {
                 sendEventToSubscribers(publisherEvent);
                 return;
             }
-            case Facade.EVENT_TYPE_GROUP: {
+            case EVENT_TYPE_GROUP: {
                 sendEventToGroup(publisherEvent);
                 return;
             }
-            case Facade.EVENT_TYPE_PRIVATE: {
+            case EVENT_TYPE_PRIVATE: {
                 sendEventToPrivateSubscriberName(publisherEvent);
                 return;
             }
-            case Facade.EVENT_TYPE_BROADCAST: {
+            case EVENT_TYPE_BROADCAST: {
                 sendBroadcastEvent(publisherEvent);
                 return;
             }
@@ -295,7 +295,7 @@ public final class Publisher {
         sendEventToPrivateSubscriberName(new PublisherEvent(subscriberRegName, body));
     }
     private void sendEventToPrivateSubscriberName(IPublisherEvent publisherEvent) {
-        publisherEvent.setType(Facade.EVENT_TYPE_PRIVATE);
+        publisherEvent.setType(EVENT_TYPE_PRIVATE);
         for (SubscriberContext subscriberContext : _registeredSubscribers.values()) {
             if (subscriberContext.getSubscriberPrivateName().equals(publisherEvent.getPrivateSubscriberName())) {
                 System.out.println("sendEventToSpecificSubscriberName: " + subscriberContext.getSubscriberPrivateName());
@@ -312,7 +312,7 @@ public final class Publisher {
         sendEventToGroup(new PublisherEvent(targetGroup, body, args));
     }
     private void sendEventToGroup(IPublisherEvent publisherEvent) {
-        publisherEvent.setType(Facade.EVENT_TYPE_GROUP);
+        publisherEvent.setType(EVENT_TYPE_GROUP);
         for (SubscriberContext subscriberContext : _registeredSubscribers.values()) {
             if (subscriberContext.getSubscriberGroupName().equals(publisherEvent.getGroupName())) {
                 System.out.println("sendEventToGroup: " + subscriberContext.getSubscriberPrivateName());
@@ -322,7 +322,7 @@ public final class Publisher {
     }
 
     private void sendBroadcastEvent(IPublisherEvent publisherEvent) {
-        publisherEvent.setType(Facade.EVENT_TYPE_BROADCAST);
+        publisherEvent.setType(EVENT_TYPE_BROADCAST);
         for (SubscriberContext subscriberContext : _registeredSubscribers.values()) {
             System.out.println("sendBroadcastEvent: " + subscriberContext.getSubscriberPrivateName());
             subscriberContext.getSubscriberInstance().listenerHandler(publisherEvent);

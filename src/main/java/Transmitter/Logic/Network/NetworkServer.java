@@ -1,6 +1,6 @@
 package Transmitter.Logic.Network;
 
-import Transmitter.Facade;
+import static Transmitter.Facade.*;
 import Transmitter.Publisher.Publisher;
 import Transmitter.ServerStarter;
 
@@ -72,11 +72,11 @@ public class NetworkServer {
     }
 
     private void messageLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
     }
 
     private void toLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_RECORD, message);
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_RECORD, message);
     }
 
 
@@ -123,7 +123,7 @@ public class NetworkServer {
 
         private void startServerTaskProducer() {
             messageLog("ServerTaskProducer start...");
-            Publisher.getInstance().sendPublisherEvent(Facade.CMD_TASK_PRODUCER_START);
+            Publisher.getInstance().sendPublisherEvent(CMD_TASK_PRODUCER_START);
         }
     }
 

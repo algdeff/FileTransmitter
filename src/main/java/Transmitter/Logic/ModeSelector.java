@@ -1,5 +1,7 @@
 package Transmitter.Logic;
 
+import static Transmitter.Facade.*;
+
 import Transmitter.Facade;
 import Transmitter.Logic.Network.FileClient;
 import Transmitter.Logic.Network.NetworkServer;
@@ -16,7 +18,6 @@ public class ModeSelector {
     private Path _receivedPath;
     private Path _outcomingPath;
     private Path _sentPath;
-    private boolean _isServerRole = false;
 
     public ModeSelector() {
         _receivedPath = ConfigManager.getReceivedPath();
@@ -75,7 +76,7 @@ public class ModeSelector {
     private void startClientRole() {
         messageLog("StartClientRole");
 
-        _isServerRole = false;
+        Facade.setServerRole(false);
         prepareWorkFolders();
 
         FileClient fileClient = new FileClient(
@@ -88,7 +89,7 @@ public class ModeSelector {
     private void startServerRole() {
         messageLog("StartServerRole");
 
-        _isServerRole = true;
+        Facade.setServerRole(true);
         prepareWorkFolders();
 
         NetworkServer networkServer = new NetworkServer(
@@ -202,7 +203,7 @@ public class ModeSelector {
 //    }
 
     private void messageLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(Facade.CMD_LOGGER_ADD_LOG, message);
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
     }
 
 }
