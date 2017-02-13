@@ -26,6 +26,8 @@ public class LogFileWorker implements ISubscriber {
     private static BlockingQueue<List<String>> _recordsQueue;
     private static Map<String, FileStatisticsContext> _filesStatistics;
 
+    private ScheduledFuture _scheduledTaskFuture;
+
     private boolean _isActive = true;
 
     private static boolean _inited = false;
@@ -64,6 +66,7 @@ public class LogFileWorker implements ISubscriber {
 
     private void shutdown() {
         _isActive = false;
+        if (_scheduledTaskFuture != null) _scheduledTaskFuture.cancel(true);
     }
 
     private void addFileToStatistics(String filename) {
@@ -94,7 +97,7 @@ public class LogFileWorker implements ISubscriber {
     }
 
     private void startStatisticsScheduler(int statWriteIntervalSec) {
-        ThreadPoolManager.getInstance().scheduledTask(() -> {
+        _scheduledTaskFuture = ThreadPoolManager.getInstance().scheduledTask(() -> {
             for (FileStatisticsContext fileContext : _filesStatistics.values()) {
                 if (fileContext.isProcessed()) continue;
                 addLog(fileContext.getFileName() + " downloads "

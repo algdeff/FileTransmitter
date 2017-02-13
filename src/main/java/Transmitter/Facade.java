@@ -53,6 +53,7 @@ public final class Facade {
                                SERVER_GET_FILES_LIST  =  "cmd_server_get_files_list",
                                     SERVER_GET_FILES  =  "cmd_server_get_files",
                                     SERVER_ADD_FILES  =  "cmd_server_add_files",
+                        SERVER_REMOTE_PROCEDURE_CALL  =  "cmd_server_remote_procedure_call",
                              SERVER_TRANSITION_EVENT  =  "cmd_server_transition_event",
                                     SERVER_TERMINATE  =  "cmd_server_terminate";
 

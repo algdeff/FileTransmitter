@@ -3,7 +3,7 @@ package Transmitter.Logic;
 import static Transmitter.Facade.*;
 
 import Transmitter.Facade;
-import Transmitter.Logic.Network.FileClient;
+import Transmitter.Logic.Network.RemoteClient;
 import Transmitter.Logic.Network.NetworkServer;
 import Transmitter.Publisher.Publisher;
 import Transmitter.ServerStarter;
@@ -79,10 +79,10 @@ public class ModeSelector {
         Facade.setServerRole(false);
         prepareWorkFolders();
 
-        FileClient fileClient = new FileClient(
+        RemoteClient remoteClient = new RemoteClient(
                 ConfigManager.getRemoteServerURL(),
                 ConfigManager.getRemoteServerPort());
-        fileClient.start();
+        remoteClient.start();
 
     }
 

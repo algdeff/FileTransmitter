@@ -102,30 +102,6 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         //System.out.println("Client terminated " + clientAddress.toString());
     }
 
-    private void clientShutdown() {
-        if (!_sessionActive) {
-            return;
-        }
-        _sessionActive = false;
-
-        try {
-            _objectOutputStream.flush();
-//            _objectOutputStream.close();
-            _serverSocketChanhel.shutdownOutput();
-            _serverSocketChanhel.shutdownInput();
-            _serverSocketChanhel.close();
-        } catch (IOException e) {
-            toLog("Client shutdown...IOException");
-        } finally {
-            messageLog("CLIENT (" + _clientID + ") SHUTDOWN...");
-            Publisher.getInstance().unregisterRemoteUser(_clientID);
-            Publisher.getInstance().sendPublisherEvent(CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN, _clientID);
-            _clientHandlerThreads.interrupt();
-        }
-
-//            ThreadPoolManager.getInstance().shutdownRunnableTasks();
-    }
-
     private void parseCommandFromClient(PublisherEvent eventFromClient) {
 
         switch (eventFromClient.getServerCommand()) {
@@ -144,6 +120,10 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
                 sendServerFileListToClient();
                 return;
             }
+            case SERVER_REMOTE_PROCEDURE_CALL: {
+                callRemoteProcedureFromClient((Runnable) eventFromClient.getBody());
+                return;
+            }
             case SERVER_TRANSITION_EVENT: {
                 publishTransitionEventFromClient(eventFromClient);
                 return;
@@ -151,11 +131,6 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
         }
         messageLog("Incorrect client command: " + eventFromClient.getServerCommand());
-
-    }
-
-    private void publishTransitionEventFromClient(PublisherEvent eventFromClient) {
-        Publisher.getInstance().sendPublisherEvent(eventFromClient);
 
     }
 
@@ -191,6 +166,33 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
     }
 
+    private void clientShutdown() {
+        if (!_sessionActive) {
+            return;
+        }
+        _sessionActive = false;
+
+        try {
+            _objectOutputStream.flush();
+//            _objectOutputStream.close();
+            _serverSocketChanhel.shutdownOutput();
+            _serverSocketChanhel.shutdownInput();
+            _serverSocketChanhel.close();
+        } catch (IOException e) {
+            toLog("Client shutdown...IOException");
+        } finally {
+            messageLog("CLIENT (" + _clientID + ") SHUTDOWN...");
+            Publisher.getInstance().unregisterRemoteUser(_clientID);
+            Publisher.getInstance().sendPublisherEvent(CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN, _clientID);
+            _clientHandlerThreads.interrupt();
+        }
+
+//            ThreadPoolManager.getInstance().shutdownRunnableTasks();
+    }
+
+
+    //=============================================================================================
+
     private void saveClientFileToReceivedFolder(FileContext fileContext) {
         Path filename = Paths.get(_receivedPath.toString(), fileContext.getFileName());
 
@@ -214,7 +216,6 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
             sendFileToClient(fileContext);
         }
     }
-
 
     private void sendFileToClient(FileContext fileContext) {
         Path fileToSend = Paths.get(fileContext.getFileFullPath()).normalize();
@@ -253,6 +254,21 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
     }
 
+    private void callRemoteProcedureFromClient(Runnable runnable) {
+        Thread remoteProcedure = new Thread(_clientHandlerThreads, runnable, "remoteProcedure");
+        remoteProcedure.setPriority(Thread.MIN_PRIORITY);
+        remoteProcedure.start();
+    }
+
+
+    private void publishTransitionEventFromClient(PublisherEvent eventFromClient) {
+        Publisher.getInstance().sendPublisherEvent(eventFromClient);
+
+    }
+
+
+    //=============================================================================================
+
     private List<FileContext> getServerOutcommingPathContent() {
         List<FileContext> fileList = new ArrayList<>();
 
@@ -287,6 +303,22 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 //        return pathMatcher.matches(pathname.getFileName());
     }
 
+    private void sendMessageToClient(String message, String ClientID) {
+        Publisher.getInstance().sendTransitionEvent(new PublisherEvent(
+                CMD_LOGGER_CONSOLE_MESSAGE, "[SERVER] " + message), ClientID);
+    }
+
+    private void messageLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_CONSOLE_MESSAGE, message);
+    }
+
+    private void toLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_RECORD, message);
+    }
+
+
+    //=============================================================================================
+
     @Override
     public void registerOnPublisher() {
         Publisher.getInstance().registerRemoteUser(this, _clientID, TRANSITION_EVENT_GROUP_ALL_USERS);
@@ -305,19 +337,6 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
             return;
         }
 
-    }
-
-    private void sendMessageToClient(String message, String ClientID) {
-        Publisher.getInstance().sendTransitionEvent(new PublisherEvent(
-                CMD_LOGGER_CONSOLE_MESSAGE, "[SERVER] " + message), ClientID);
-    }
-
-    private void messageLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_CONSOLE_MESSAGE, message);
-    }
-
-    private void toLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_RECORD, message);
     }
 
 }
