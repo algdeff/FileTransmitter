@@ -32,6 +32,11 @@ public class RemoteTaskEntity implements IRemoteTaskEntity, Serializable {
         return _taskName;
     }
 
+    @Override
+    public String getTaskType() {
+        return TASK_TYPE_INSTANT;
+    }
+
     public void setAssignedClientName(String assignedClientName) {
         _assignedClientName = assignedClientName;
     }

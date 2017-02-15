@@ -27,9 +27,6 @@ public class ModeSelector {
 
     public void start() {
 
-
-//        if (true) return;
-
         boolean isSelected = false;
 
         while (!isSelected) {

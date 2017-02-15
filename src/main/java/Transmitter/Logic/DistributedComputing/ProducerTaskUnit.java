@@ -27,11 +27,11 @@ public class ProducerTaskUnit implements Callable<Object>, Serializable {
             result += value >> 2;
 
             try {
-                TimeUnit.MILLISECONDS.sleep(100);
+                TimeUnit.MILLISECONDS.sleep(10);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            System.out.println(result);
+//            System.out.println(result);
 
         }
 

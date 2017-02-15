@@ -8,6 +8,16 @@ import Transmitter.Logic.ModeSelector;
 import Transmitter.Logic.Workers.LogFileWorker;
 import Transmitter.Publisher.Publisher;
 
+/**
+ * Transmitter
+ *
+ * Инициализация и завершение работы модулей
+ *
+ *
+ * @author  Anton Butenko
+ *
+ */
+
 public class ServerStarter {
 
     private static String _serverName = "Transmitter";
@@ -20,8 +30,6 @@ public class ServerStarter {
 
     public static void main(String[] args) {
 
-        //InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory());
-
         try {
             _instance = new ServerStarter();
             _instance.start();
@@ -33,12 +41,7 @@ public class ServerStarter {
             stopServerInstance();
         }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            //_timer.cancel();
-            stopServerInstance();
-            //LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();
-            //lc.stop();
-        }));
+        Runtime.getRuntime().addShutdownHook(new Thread(ServerStarter::stopServerInstance));
     }
 
 
@@ -62,8 +65,7 @@ public class ServerStarter {
     }
 
     private void stop() {
-
-        Publisher.getInstance().sendPublisherEvent(SERVER_TERMINATE);
+        Publisher.getInstance().sendPublisherEvent(GLOBAL_SHUTDOWN);
         System.err.println("Server STOP");
     }
 

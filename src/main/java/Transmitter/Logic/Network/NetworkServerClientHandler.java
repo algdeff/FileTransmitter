@@ -55,7 +55,7 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         try {
             clientAddress = _serverSocketChanhel.getRemoteAddress();
             if (_serverSocketChanhel.isOpen()) {
-                messageLog("New client (" + _clientID + ") connected: " + clientAddress);
+                message("New client (" + _clientID + ") connected: " + clientAddress);
 
                 InputStream inputStream = Channels.newInputStream(_serverSocketChanhel);
                 _objectInputStream = new ObjectInputStream(inputStream);
@@ -63,25 +63,24 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 //                initTransitionEventSender();
                 registerOnPublisher();
 
-                sendEventToClient(new PublisherEvent(SERVER_SET_CLIENT_ID, _clientID).toServerCommand());
+                sendEventToClient(new PublisherEvent(CMD_SERVER_SET_CLIENT_ID, _clientID).toServerCommand());
 
                 while (_sessionActive) {
                     Object receivedObject = _objectInputStream.readObject();
 
                     if (!receivedObject.getClass().getName().equals(PublisherEvent.class.getName())) {
-                        messageLog("Incorrect event object type");
+                        message("Incorrect event object type");
                         continue;
                     }
                     PublisherEvent eventFromClient = (PublisherEvent) receivedObject;
 
                     if (eventFromClient.getServerCommand() == null) {
-                        messageLog("No server command found in event: " + eventFromClient.getInterestName());
+                        message("No server command found in event: " + eventFromClient.getInterestName());
                         continue;
                     }
 
-                    if (eventFromClient.getServerCommand().equals(SERVER_TERMINATE)) {
-                        messageLog("CMD_SERVER_TERMINATE");
-                        //clientSocket.close();
+                    if (eventFromClient.getServerCommand().equals(CMD_SERVER_TERMINATE)) {
+                        clientShutdown();
                         break;
                     }
                     parseCommandFromClient(eventFromClient);
@@ -89,12 +88,12 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
 //                clientSocket.shutdownInput();
 //                clientSocket.shutdownOutput();
-                messageLog("Client (" + clientAddress + ") successfully terminated");
+                message("Client (" + clientAddress + ") successfully terminated");
             }
         } catch (ClassNotFoundException e) {
             toLog(e.getMessage());
         } catch (IOException e) {
-            messageLog("Client ("+ clientAddress +") is breakdown!");
+            message("Client ("+ clientAddress +") is breakdown!");
         } finally {
             clientShutdown();
         }
@@ -105,32 +104,32 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
     private void parseCommandFromClient(PublisherEvent eventFromClient) {
 
         switch (eventFromClient.getServerCommand()) {
-            case SERVER_ADD_FILES: {
+            case CMD_SERVER_ADD_FILES: {
 //                System.err.println("Command: " + command);
                 saveClientFileToReceivedFolder((FileContext) eventFromClient.getBody());
                 return;
             }
-            case SERVER_GET_FILES: {
+            case CMD_SERVER_GET_FILES: {
 //                System.err.println("Command: " + command);
                 sendSelectedServerFilesToClient((List<FileContext>) eventFromClient.getBody());
                 return;
             }
-            case SERVER_GET_FILES_LIST: {
+            case CMD_SERVER_GET_FILES_LIST: {
 //                System.err.println("Command: " + command);
                 sendServerFileListToClient();
                 return;
             }
-            case SERVER_REMOTE_PROCEDURE_CALL: {
+            case CMD_SERVER_REMOTE_PROCEDURE_CALL: {
                 callRemoteProcedureFromClient((Runnable) eventFromClient.getBody());
                 return;
             }
-            case SERVER_TRANSITION_EVENT: {
+            case CMD_SERVER_TRANSITION_EVENT: {
                 publishTransitionEventFromClient(eventFromClient);
                 return;
             }
 
         }
-        messageLog("Incorrect client command: " + eventFromClient.getServerCommand());
+        message("Incorrect client command: " + eventFromClient.getServerCommand());
 
     }
 
@@ -138,7 +137,9 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         try {
             _outcomeEventsToClientQueue.put(publisherEvent);
         } catch (InterruptedException e) {
+            messageAndLog("sendEventToClient interrupted");
             toLog(e.getMessage());
+            clientShutdown();
         }
 
     }
@@ -181,9 +182,9 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         } catch (IOException e) {
             toLog("Client shutdown...IOException");
         } finally {
-            messageLog("CLIENT (" + _clientID + ") SHUTDOWN...");
+            message("CLIENT (" + _clientID + ") SHUTDOWN...");
             Publisher.getInstance().unregisterRemoteUser(_clientID);
-            Publisher.getInstance().sendPublisherEvent(CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN, _clientID);
+            Publisher.getInstance().sendPublisherEvent(CMD_INTERNAL_CLIENT_BREAKDOWN, _clientID);
             _clientHandlerThreads.interrupt();
         }
 
@@ -202,12 +203,12 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         try {
             Files.write(filename, fileContent, StandardOpenOption.CREATE);
         } catch (IOException e) {
-            e.printStackTrace();
-            ServerStarter.stopAndExit(1);
+            messageAndLog("Error in saveClientFileToReceivedFolder");
+            toLog(e.getMessage());
         }
 
         sendMessageToClient("Received transmission", _clientID);
-        messageLog("Done");
+        message("Done");
 
     }
 
@@ -230,6 +231,7 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         try {
             fileContent = Files.readAllBytes(fileToSend);
         } catch (IOException e) {
+            messageAndLog("Error in sendFileToClient");
             toLog(e.getMessage());
         }
         long fileSize = fileContent.length;
@@ -240,7 +242,7 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
         sendMessageToClient("Start transmission: " + fileToSend.getFileName().toString()
                 + " @ " + fileSize + " bytes...", _clientID);
 
-        PublisherEvent eventToClient = new PublisherEvent(SERVER_GET_FILES, fileContext).toServerCommand();
+        PublisherEvent eventToClient = new PublisherEvent(CMD_SERVER_GET_FILES, fileContext).toServerCommand();
         sendEventToClient(eventToClient);
 
         Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_FILE_TO_STATISTICS, fileToSend.toString());
@@ -248,7 +250,7 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
     }
 
     private void sendServerFileListToClient() {
-        PublisherEvent eventToServer = new PublisherEvent(SERVER_GET_FILES_LIST).toServerCommand();
+        PublisherEvent eventToServer = new PublisherEvent(CMD_SERVER_GET_FILES_LIST).toServerCommand();
         eventToServer.setBody(getServerOutcommingPathContent());
         sendEventToClient(eventToServer);
 
@@ -283,7 +285,8 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
             }
 
         } catch (IOException e) {
-            toLog("directoryWalking:" + e.getMessage());
+            messageAndLog("Error in getServerOutcommingPathContent");
+            toLog(e.getMessage());
         }
 
         return fileList;
@@ -308,8 +311,12 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
                 CMD_LOGGER_CONSOLE_MESSAGE, "[SERVER] " + message), ClientID);
     }
 
-    private void messageLog(String message) {
+    private void message(String message) {
         Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_CONSOLE_MESSAGE, message);
+    }
+
+    private void messageAndLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
     }
 
     private void toLog(String message) {
@@ -331,8 +338,8 @@ public class NetworkServerClientHandler implements ISubscriber, Runnable {
 
     @Override
     public void listenerHandler(IPublisherEvent outcomeTransitionEvent) {
-        if (outcomeTransitionEvent.getServerCommand().equals(SERVER_TRANSITION_EVENT)) {
-            messageLog("Send transition event to client: " + _clientID);
+        if (outcomeTransitionEvent.getServerCommand().equals(CMD_SERVER_TRANSITION_EVENT)) {
+            message("Send transition event to client: " + _clientID);
             sendEventToClient((PublisherEvent) outcomeTransitionEvent);
             return;
         }

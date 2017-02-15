@@ -28,7 +28,9 @@ public class RemoteClient implements ISubscriber {
 
     private String _clientID = null;
 
+    private volatile boolean _sessionActive = true;
     private boolean _uiActive = true;
+
     private boolean _skipClientMenu = false;
 
     private ThreadGroup _clientControllerThreads;
@@ -63,8 +65,8 @@ public class RemoteClient implements ISubscriber {
     }
 
     private void openConnectionToServer() {
-        int threadsNumber = 10;
-        ExecutorService executorService = Executors.newWorkStealingPool(threadsNumber); //ForkJoinPool.commonPool(); //Executors.newFixedThreadPool(50);
+//        int threadsNumber = 10;
+//        ExecutorService executorService = Executors.newWorkStealingPool(threadsNumber); //ForkJoinPool.commonPool(); //Executors.newFixedThreadPool(50);
 
         try {
 //            InetSocketAddress  hostAddress = new InetSocketAddress(InetAddress.getByName(_remoteServerUrl),_remoteServerPort);
@@ -79,7 +81,7 @@ public class RemoteClient implements ISubscriber {
                     isConnected = true;
                 } catch (ExecutionException | InterruptedException ee) {
                     _clientSocketChannel.close();
-                    messageLog("Connecting to server: " + hostAddress + "......");
+                    message("Connecting to server: " + hostAddress + "......");
                     try {
                         TimeUnit.SECONDS.sleep(10);
                     } catch (InterruptedException e) {
@@ -87,7 +89,7 @@ public class RemoteClient implements ISubscriber {
                     }
                 }
             }
-            messageLog("Connected to server " + hostAddress);
+            message("Connected to server " + hostAddress);
 
             initOutcomeEventsToServerQueue();
 //            initTransitionEventSender();
@@ -105,7 +107,7 @@ public class RemoteClient implements ISubscriber {
 //            objectOutputStream.close();
 //            clientSocketChannel.close();
         } catch (IOException e) {
-            messageLog("Server breakdown!");
+            message("Server breakdown!");
             clientShutdown();
         }
 
@@ -118,13 +120,13 @@ public class RemoteClient implements ISubscriber {
             try {
                 _objectOutputStream = new ObjectOutputStream(outputStream);
 
-                while (true) {
+                while (_sessionActive) {
                     PublisherEvent publisherEvent = _outcomeEventsToServerQueue.take();
                     _objectOutputStream.writeObject(publisherEvent);
                 }
 
             } catch (InterruptedException | IOException e) {
-                messageLog("Output stream break!");
+                message("Output stream break!");
             } finally {
                 clientShutdown();
             }
@@ -135,6 +137,10 @@ public class RemoteClient implements ISubscriber {
     }
 
     private void clientShutdown() {
+        if (!_sessionActive) {
+            return;
+        }
+        _sessionActive = false;
 
         try {
             _objectOutputStream.flush();
@@ -142,8 +148,10 @@ public class RemoteClient implements ISubscriber {
         } catch (IOException e) {
             toLog("Client shutdown...IOException");
         } finally {
-            messageLog("CLIENT (" + _clientID + ") SHUTDOWN...");
+            message("CLIENT (" + _clientID + ") SHUTDOWN...");
         }
+
+        ServerStarter.stopAndExit(1);
 
     }
 
@@ -159,34 +167,31 @@ public class RemoteClient implements ISubscriber {
 
         private void serverCommandListener() {
             try {
-                while (true) {
+                while (_sessionActive) {
                     Object receivedObject = _objectInputStream.readObject();
 
                     if (!receivedObject.getClass().getName().equals(PublisherEvent.class.getName())) {
-                        messageLog("Incorrect event object type");
+                        message("Incorrect event object type");
                         continue;
                     }
                     PublisherEvent eventFromServer = (PublisherEvent) receivedObject;
 
                     if (eventFromServer.getServerCommand() == null) {
-                        messageLog("No server command found in event: " + eventFromServer.getInterestName());
+                        message("No server command found in event: " + eventFromServer.getInterestName());
                         continue;
                     }
 
-                    if (eventFromServer.getServerCommand().equals(SERVER_TERMINATE)) {
-                        messageLog("CMD_SERVER_TERMINATE");
-                        //clientSocket.close();
+                    if (eventFromServer.getServerCommand().equals(CMD_SERVER_TERMINATE)) {
+                        message("CMD_SERVER_TERMINATE");
+                        clientShutdown();
                         break;
                     }
                     parseCommandFromServer(eventFromServer);
                 }
 
-            } catch (IOException e) {
-//                    toLog(e.getMessage());
-                messageLog(e.getMessage());
-            } catch (ClassNotFoundException e) {
-                messageLog(e.getMessage());
-//                    toLog(e.getMessage());
+            } catch (IOException | ClassNotFoundException e) {
+                message("serverCommandListener interrupted: " + e.getMessage());
+                clientShutdown();
             }
 
         }
@@ -194,23 +199,23 @@ public class RemoteClient implements ISubscriber {
         private void parseCommandFromServer(PublisherEvent eventFromServer) {
 
             switch (eventFromServer.getServerCommand()) {
-                case SERVER_SET_CLIENT_ID: {
+                case CMD_SERVER_SET_CLIENT_ID: {
                     setClientID((String) eventFromServer.getBody());
                     toLog(getClientID());
                     return;
                 }
 
-                case SERVER_ADD_FILES: {
+                case CMD_SERVER_ADD_FILES: {
 
 //                    System.err.println("Command: " + command);
                     return;
                 }
-                case SERVER_GET_FILES: {
+                case CMD_SERVER_GET_FILES: {
 //                    System.err.println("Command: " + command);
                     saveServerFileToReceivedFolder((FileContext) eventFromServer.getBody());
                     return;
                 }
-                case SERVER_GET_FILES_LIST: {
+                case CMD_SERVER_GET_FILES_LIST: {
 //                    System.err.println("Command: " + command);
                     _serverFilesListCache.clear();
                     _serverFilesListCache.addAll((List<FileContext>) eventFromServer.getBody());
@@ -218,16 +223,16 @@ public class RemoteClient implements ISubscriber {
                     showClientMenu();
                     return;
                 }
-                case SERVER_REMOTE_PROCEDURE_CALL: {
+                case CMD_SERVER_REMOTE_PROCEDURE_CALL: {
                     return;
                 }
-                case SERVER_TRANSITION_EVENT: {
+                case CMD_SERVER_TRANSITION_EVENT: {
                     publishTransitionEventFromServer(eventFromServer);
                     return;
                 }
 
             }
-            messageLog("Incorrect server command: " + eventFromServer.getServerCommand());
+            message("Incorrect server command: " + eventFromServer.getServerCommand());
 
         }
 
@@ -237,13 +242,15 @@ public class RemoteClient implements ISubscriber {
         try {
             _outcomeEventsToServerQueue.put(publisherEvent);
         } catch (InterruptedException e) {
+            messageAndLog("sendEventToServer interrupted");
             toLog(e.getMessage());
+            clientShutdown();
         }
 
     }
 
     private void callRemoteProcedureOnServer(Runnable runnable) {
-        PublisherEvent procedureEvent = new PublisherEvent(SERVER_REMOTE_PROCEDURE_CALL, runnable).toServerCommand();
+        PublisherEvent procedureEvent = new PublisherEvent(CMD_SERVER_REMOTE_PROCEDURE_CALL, runnable).toServerCommand();
         sendEventToServer(procedureEvent);
     }
 
@@ -259,11 +266,11 @@ public class RemoteClient implements ISubscriber {
         try {
             Files.write(filename, fileContent, StandardOpenOption.CREATE);
         } catch (IOException e) {
-            e.printStackTrace();
-            ServerStarter.stopAndExit(1);
+            messageAndLog("Error in saveServerFileToReceivedFolder");
+            toLog(e.getMessage());
         }
 
-        messageLog("Done");
+        message("Done");
     }
 
     private void showServerFilesList() {
@@ -271,7 +278,7 @@ public class RemoteClient implements ISubscriber {
         for (FileContext file : _serverFilesListCache) {
             int index = _serverFilesListCache.indexOf(file);
             file.setFileIndex(index);
-            messageLog(String.format("%1$s: %2$s (%3$s KiB)", index, file.getFileName(), file.getFormattedSizeKb()));
+            message(String.format("%1$s: %2$s (%3$s KiB)", index, file.getFileName(), file.getFormattedSizeKb()));
         }
     }
 
@@ -288,7 +295,7 @@ public class RemoteClient implements ISubscriber {
             return;
         }
 
-        messageLog( "   You choice: \n" +
+        message( "   You choice: \n" +
                 "1. Send file to server\n" +
                 "2. Receive file from server\n" +
                 "3. List server files\n" +
@@ -311,7 +318,7 @@ public class RemoteClient implements ISubscriber {
 
                 showClientMenu();
 
-                while (_uiActive) {
+                while (_uiActive && _sessionActive) {
 
                     BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
                     String choice = stdin.readLine();
@@ -347,7 +354,7 @@ public class RemoteClient implements ISubscriber {
                         }
                         case "8": {
                         }
-                        ServerStarter.stopAndExit(0);
+                        clientShutdown();
                     }
 
                 }
@@ -355,16 +362,16 @@ public class RemoteClient implements ISubscriber {
                 toLog(e.getMessage());
             }
 
-            messageLog("/Client UI terminate/");
+            message("/Client UI terminate/");
 
         }
 
         private void selectAndSendFilesToServer() {
             List<FileContext> fileList = getClientOutcommingPathContent();
 
-            messageLog("[SendFilesToServer]");
+            message("[SendFilesToServer]");
             showClientFilesList(fileList);
-            messageLog("Select file index to send it to the server: ");
+            message("Select file index to send it to the server: ");
 
             BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
             String choice = "";
@@ -376,7 +383,7 @@ public class RemoteClient implements ISubscriber {
             int selectedIndex = Integer.parseInt(choice);
 
             if (selectedIndex >= fileList.size() || selectedIndex < 0) {
-                messageLog("Incorrect file index!");
+                message("Incorrect file index!");
                 return;
             }
 
@@ -397,7 +404,7 @@ public class RemoteClient implements ISubscriber {
             Path fileToSend = Paths.get(fileContext.getFileFullPath()).normalize();
 
             if (!Files.exists(fileToSend)) {
-                messageLog("File: " + fileToSend.toString() + " is not exist");
+                message("File: " + fileToSend.toString() + " is not exist");
                 return;
             }
 
@@ -412,7 +419,7 @@ public class RemoteClient implements ISubscriber {
             fileContext.setFileSize(fileSize);
             fileContext.setFileContent(fileContent);
 
-            PublisherEvent eventToClient = new PublisherEvent(SERVER_ADD_FILES, fileContext).toServerCommand();
+            PublisherEvent eventToClient = new PublisherEvent(CMD_SERVER_ADD_FILES, fileContext).toServerCommand();
             sendEventToServer(eventToClient);
 
             Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_FILE_TO_STATISTICS, fileToSend.toString());
@@ -421,7 +428,7 @@ public class RemoteClient implements ISubscriber {
 
 
         private void selectFilesToReceiveFromServer() {
-            messageLog("[ReceiveFileFromServer]");
+            message("[ReceiveFileFromServer]");
             if (_serverFilesListCache.size() == 0) {
                 skipClientMenu();
                 listServerFiles();
@@ -429,7 +436,7 @@ public class RemoteClient implements ISubscriber {
                 showServerFilesList();
             }
 
-            messageLog("Select index of server file to receive it: ");
+            message("Select index of server file to receive it: ");
             BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
             String choice = "";
             try {
@@ -440,7 +447,7 @@ public class RemoteClient implements ISubscriber {
             int selectedIndex = Integer.parseInt(choice);
 
             if (selectedIndex >= _serverFilesListCache.size() || selectedIndex < 0) {
-                messageLog("Incorrect file index!");
+                message("Incorrect file index!");
                 showClientMenu();
                 return;
             }
@@ -449,20 +456,20 @@ public class RemoteClient implements ISubscriber {
             selectedFiles.add(_serverFilesListCache.get(selectedIndex));
 
             PublisherEvent eventToServer = new PublisherEvent(
-                    SERVER_GET_FILES, selectedFiles).toServerCommand();
+                    CMD_SERVER_GET_FILES, selectedFiles).toServerCommand();
             sendEventToServer(eventToServer);
 
         }
 
         private void listServerFiles() {
-            messageLog("[ListServerFiles]");
-            PublisherEvent eventToServer = new PublisherEvent(SERVER_GET_FILES_LIST).toServerCommand();
+            message("[ListServerFiles]");
+            PublisherEvent eventToServer = new PublisherEvent(CMD_SERVER_GET_FILES_LIST).toServerCommand();
             sendEventToServer(eventToServer);
 
         }
 
         private void listClientFiles() {
-            messageLog("[ListClientFiles]");
+            message("[ListClientFiles]");
             showClientFilesList(getClientOutcommingPathContent());
         }
 
@@ -472,15 +479,15 @@ public class RemoteClient implements ISubscriber {
         }
 
         private void callRemoteProcedure() {
-            messageLog("[RemoteProcedureCall]");
+            message("[RemoteProcedureCall]");
             callRemoteProcedureOnServer(new WebServiceExecutable(getClientID()));
         }
 
         private void transitionEventDemo() {
-            messageLog("[Transition event demo...]");
+            message("[Transition event demo...]");
             PublisherEvent publisherEvent = new PublisherEvent(CMD_EXECUTOR_DEMO,
                     "CLIENT: THIS OUTCOME MESSAGE send to CMD_EXECUTOR_DEMO")
-                    .addServerCommand(SERVER_TRANSITION_EVENT);
+                    .addServerCommand(CMD_SERVER_TRANSITION_EVENT);
 
             sendEventToServer(publisherEvent);
         }
@@ -488,7 +495,7 @@ public class RemoteClient implements ISubscriber {
         private void showClientFilesList(List<FileContext> fileList) {
             for (FileContext file : fileList) {
                 int index = fileList.indexOf(file);
-                messageLog(String.format("%1$s: %2$s (%3$s KiB)", index, file.getFileName(), file.getFormattedSizeKb()));
+                message(String.format("%1$s: %2$s (%3$s KiB)", index, file.getFileName(), file.getFormattedSizeKb()));
             }
         }
 
@@ -537,8 +544,12 @@ public class RemoteClient implements ISubscriber {
         _skipClientMenu = true;
     }
 
-    private void messageLog(String message) {
+    private void message(String message) {
         Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_CONSOLE_MESSAGE, message);
+    }
+
+    private void messageAndLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
     }
 
     private void toLog(String message) {
@@ -557,31 +568,31 @@ public class RemoteClient implements ISubscriber {
     public String[] subscriberInterests() {
         return new String[] {
                 CMD_NET_CLIENT_UI_BREAK,
-                CMD_NET_CLIENT_SHUTDOWN
+                GLOBAL_SHUTDOWN
         };
     }
 
     @Override
     public void listenerHandler(IPublisherEvent publisherEvent) {
-        if (publisherEvent.getServerCommand().equals(SERVER_TRANSITION_EVENT)) {
-            messageLog("Send transition event to Server, type is: " + publisherEvent.getGroupName());
+        if (publisherEvent.getServerCommand().equals(CMD_SERVER_TRANSITION_EVENT)) {
+//            message("Send transition event to Server, type is: " + publisherEvent.getGroupName());
             sendEventToServer((PublisherEvent) publisherEvent);
             return;
         }
         if (publisherEvent.getType().equals(EVENT_TYPE_GROUP)) {
-            messageLog("NetClient received group event ("
+            message("NetClient received group event ("
                     + publisherEvent.getGroupName() + "): \n" + publisherEvent.getBody().toString());
         }
 
         switch (publisherEvent.getInterestName()) {
             case CMD_NET_CLIENT_UI_BREAK: {
-                messageLog("CMD_NET_CLIENT_UI_BREAK " + publisherEvent.getBody());
+                message("CMD_NET_CLIENT_UI_BREAK " + publisherEvent.getBody());
                 _uiActive = false;
                 break;
             }
 
-            case CMD_NET_CLIENT_SHUTDOWN: {
-                messageLog("CMD_NET_CLIENT_SHUTDOWN " + publisherEvent.getBody());
+            case GLOBAL_SHUTDOWN: {
+                clientShutdown();
                 break;
             }
 

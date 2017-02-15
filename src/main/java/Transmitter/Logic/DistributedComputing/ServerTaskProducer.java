@@ -7,19 +7,51 @@ import Transmitter.Publisher.Interfaces.IPublisherEvent;
 import Transmitter.Publisher.Publisher;
 import Transmitter.Publisher.PublisherEvent;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.*;
 
+/**
+ * ServerTaskProducer
+ *
+ * TaskGenerator, при старте генерирует список задач для выполнения группой удаленных клиентов и
+ * помещает их в очередь _preparedTaskQueue.
+ *
+ * TasksAllocator, берет задачи из очереди _preparedTaskQueue и назначает их зарегистрированным
+ * клиентам (@key в _registeredClients) порциями, по ASSIGNED_TASKS_LIST_SIZE задач на каждого клиента.
+ * Периодически проверяется сколько осталось невыполненных задач у каждого клиента, если все задачи
+ * выполнены и размер List<IRemoteTaskEntity> в _registeredClients равен 0, то назначаются новые
+ * задачи.
+ *
+ *
+ * @author  Anton Butenko
+ *
+ */
 
 public class ServerTaskProducer implements ISubscriber {
 
     private static final String NAME = "TASK_PRODUCER_DE7F";
 
-    private static BlockingQueue<RemoteTaskEntity> _completeTaskQueue;
-    private static BlockingQueue<RemoteTaskEntity> _preparedTaskQueue;
+    //число задачь отправляемое клиенту за раз
+    private static final int ASSIGNED_TASKS_LIST_SIZE = 5;
 
+    //интервал проверки выполненных задач для TasksAllocator, сек.
+    private static final int TASK_ALLOCATOR_CHECK_INTERVAL = 5;
+
+    private static BlockingQueue<IRemoteTaskEntity> _completeTaskQueue;
+    private static BlockingQueue<IRemoteTaskEntity> _preparedTaskQueue;
+
+    /**
+     *  @key    - имя зарегистрированного клиента (clientID);
+     *  @value  - список задач назначенных данному клиенту.
+     */
     private static ConcurrentMap<String, List<IRemoteTaskEntity>> _registeredClients;
+
+    private volatile boolean _sessionActive = true;
 
     private static boolean _inited = false;
 
@@ -30,8 +62,8 @@ public class ServerTaskProducer implements ISubscriber {
     public void init() {
         if (_inited) return;
 
-        _completeTaskQueue = new LinkedBlockingQueue<>(50);
-        _preparedTaskQueue = new LinkedBlockingQueue<>(10);
+        _completeTaskQueue = new LinkedBlockingQueue<>();
+        _preparedTaskQueue = new LinkedBlockingQueue<>(); //DelayQueue<>() for server schedule;
 
         _registeredClients = new ConcurrentHashMap<>();
 
@@ -40,22 +72,25 @@ public class ServerTaskProducer implements ISubscriber {
     }
 
     private void delayedStart() {
-        messageLog("[ServerTaskProducer] Preparing trasks....");
+        messageAndLog("[ServerTaskProducer] Preparing trasks....");
 
         startTasksGenerator();
 
         try {
             TimeUnit.SECONDS.sleep(2);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            toLog(e.getMessage());
         }
         System.out.println("Тotal prepared tasks: " + _preparedTaskQueue.size());
 
-        messageLog("[ServerTaskProducer] Run tasks allocator");
+        messageAndLog("[ServerTaskProducer] Run tasks allocator");
 
         startTasksAllocator();
 
+    }
 
+    private void shutdown() {
+        _sessionActive = false;
     }
 
     private void startTasksAllocator() {
@@ -64,22 +99,27 @@ public class ServerTaskProducer implements ISubscriber {
 
     private void startTasksGenerator() {
         ThreadPoolManager.getInstance().executeRunnable(new TaskGenerator());
-//        new Thread(new TaskGenerator()).start();
     }
 
-    private void registerNewExecutor(String ClientID) {
-        if (_registeredClients.containsKey(ClientID)) {
-            messageLog("[ServerTaskProducer] client " + ClientID + " already registered");
-//            rerun
+    /**
+     *  Регистрируем нового клиента в _registeredClients, с пустым списком задач для назначения TasksAllocator'ом
+     */
+    private void registerNewExecutor(String clientID) {
+        if (_registeredClients.containsKey(clientID)) {
+            messageAndLog("[ServerTaskProducer] client " + clientID + " already registered");
             return;
         }
-        messageLog("[ServerTaskProducer] Register new client: " + ClientID);
-        _registeredClients.put(ClientID,  new CopyOnWriteArrayList<>());
+        messageAndLog("[ServerTaskProducer] Register new client: " + clientID);
+        _registeredClients.put(clientID,  new CopyOnWriteArrayList<>());
 
     }
 
-    private void collectCompletedTasks(RemoteTaskEntity completedTask) {
-        messageLog("Collect completed task (" + completedTask.getTaskName()
+    /**
+     *  Получаем от каждого клиента выполненную задачу, удаляем ее из списка назначенных клиенту задач,
+     *  и помещаем ее в очередь выполненных задач _completeTaskQueue.
+     */
+    private void collectCompletedTask(IRemoteTaskEntity completedTask) {
+        messageAndLog("Collect completed task (" + completedTask.getTaskName()
                 + ") from client " + completedTask.getAssignedClientName());
 
         String client = completedTask.getAssignedClientName();
@@ -93,14 +133,49 @@ public class ServerTaskProducer implements ISubscriber {
             }
         }
 
-        messageLog("Result: " + completedTask.getCompletedTaskResult().toString());
+        messageAndLog("Remain " + clientTasks.size() +  " tasks, result:" + completedTask.getCompletedTaskResult().toString());
 
         try {
             _completeTaskQueue.put(completedTask);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            messageAndLog("collectCompletedTask interrupted");
+            toLog(e.getMessage());
         }
-        messageLog("Completed tasks number: " + _completeTaskQueue.size());
+        messageAndLog("Completed tasks number: " + _completeTaskQueue.size());
+    }
+
+    /**
+     *  Снятие отключенного клиента с регистрации и возвращение невыполненных задач в пул _preparedTaskQueue
+     */
+    private void restoreUncompletedTasks(String client_ID) {
+        if (!_registeredClients.keySet().contains(client_ID)) {
+            messageAndLog("[ServerTaskProducer] Client (" + client_ID + ") is not registered!");
+            return;
+        }
+
+        List<IRemoteTaskEntity> clientTasks = new ArrayList<>(_registeredClients.get(client_ID));
+        _registeredClients.remove(client_ID);
+
+        _preparedTaskQueue.addAll(clientTasks);
+
+        messageAndLog("[ServerTaskProducer] " + clientTasks.size()
+                + " uncompleted client (" + client_ID
+                + ") tasks restored. Client unregistered.");
+    }
+
+    private void sendTasksToClient(List<IRemoteTaskEntity> tasks, String clientID) {
+        Publisher.getInstance().sendTransitionEvent(new PublisherEvent(
+                CMD_TASK_EXECUTOR_ADD_NEW_TASKS, new ArrayList<>(tasks)), clientID);
+        // !обязательно создаем новый List, иначе при сериализации получим старые ссылки!
+
+    }
+
+    private void messageAndLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
+    }
+
+    private void toLog(String message) {
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_RECORD, message);
     }
 
     @Override
@@ -115,14 +190,15 @@ public class ServerTaskProducer implements ISubscriber {
                 CMD_TASK_PRODUCER_REGISTER_EXECUTOR,
                 CMD_TASK_PRODUCER_GET_NEW_TASK,
                 CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK,
-                CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN
+                CMD_INTERNAL_CLIENT_BREAKDOWN,
+                GLOBAL_SHUTDOWN
         };
     }
 
     @Override
     public void listenerHandler(IPublisherEvent publisherEvent) {
         if (publisherEvent.getType().equals(EVENT_TYPE_GROUP)) {
-            messageLog("TASK_PRODUCER - received group event ("
+            messageAndLog("TASK_PRODUCER - received group event ("
                     + publisherEvent.getInterestName() + "): \n" + publisherEvent.getBody().toString());
         }
 
@@ -138,55 +214,24 @@ public class ServerTaskProducer implements ISubscriber {
 
             }
             case CMD_TASK_PRODUCER_GET_NEW_TASK: {
-                messageLog("CMD_TASK_PRODUCER_GET_NEW_TASK" + publisherEvent.getBody().toString());
+                messageAndLog("CMD_TASK_PRODUCER_GET_NEW_TASK" + publisherEvent.getBody().toString());
                 break;
 
             }
             case CMD_TASK_PRODUCER_COLLECT_COMPLETE_TASK: {
-                collectCompletedTasks((RemoteTaskEntity) publisherEvent.getBody());
+                collectCompletedTask((IRemoteTaskEntity) publisherEvent.getBody());
                 break;
             }
-            case CMD_SERVER_INTERNAL_CLIENT_SHUTDOWN: {
+            case CMD_INTERNAL_CLIENT_BREAKDOWN: {
                 restoreUncompletedTasks((String) publisherEvent.getBody());
                 break;
             }
-
-        }
-    }
-
-    private void messageLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
-    }
-
-    private void toLog(String message) {
-        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_RECORD, message);
-    }
-
-    private void sendTasktoClient(String ClientID, IRemoteTaskEntity task) {
-        Publisher.getInstance().sendTransitionEvent(new PublisherEvent(
-                CMD_TASK_EXECUTOR_ADD_NEW_TASK, task), ClientID);
-    }
-
-    private void restoreUncompletedTasks(String Client_ID) {
-        if (!_registeredClients.keySet().contains(Client_ID)) {
-            messageLog("[ServerTaskProducer] Client (" + Client_ID + ") is not registered!");
-            return;
-        }
-
-        List<IRemoteTaskEntity> clientTasks = new ArrayList<>(_registeredClients.get(Client_ID));
-        _registeredClients.remove(Client_ID);
-
-        for (IRemoteTaskEntity clientTask : clientTasks) {
-            try {
-                _preparedTaskQueue.put((RemoteTaskEntity) clientTask);
-            } catch (InterruptedException e) {
-                toLog("[ServerTaskProducer] restoreUncompletedTasks: InterruptedException");
+            case GLOBAL_SHUTDOWN: {
+                shutdown();
+                break;
             }
-        }
 
-        messageLog("[ServerTaskProducer] " + clientTasks.size()
-                + " uncompleted tasks for client (" + Client_ID
-                + ") restored. Client unregistered.");
+        }
     }
 
     private class TasksAllocator implements Runnable {
@@ -194,34 +239,33 @@ public class ServerTaskProducer implements ISubscriber {
         @Override
         public void run() {
 
-            RemoteTaskEntity newTask = null;
+            try {
+                while (_sessionActive) {
 
-            while (true) {
+                    for (String client : _registeredClients.keySet()) {
+                        List<IRemoteTaskEntity> clientTasks = _registeredClients.get(client);
+                        if (clientTasks.size() == 0) {
 
-                for (String client : _registeredClients.keySet()) {
-                    List<IRemoteTaskEntity> clientTasks = _registeredClients.get(client);
-                    if (clientTasks.size() == 0) {
-                        try {
-                            newTask = _preparedTaskQueue.take();
+                            for (int i = 0; i < ASSIGNED_TASKS_LIST_SIZE; i++) {
+                                IRemoteTaskEntity newTask = _preparedTaskQueue.take();
+                                newTask.setAssignedClientName(client);
+                                clientTasks.add(newTask);
+                                messageAndLog("New task (" + newTask.getTaskName() + ") assigned to client: " + client);
+                            }
 
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
+                            messageAndLog("Send " + clientTasks.size() + " tasks to client: " + client);
+                            sendTasksToClient(clientTasks, client);
                         }
-                        newTask.setAssignedClientName(client);
-                        clientTasks.add(newTask);
-                        sendTasktoClient(client, newTask);
-                        messageLog("Assign and send new task (" + newTask.getTaskName() + ") to client: " + client);
                     }
-                }
-//                System.out.println("TASKS QUEUE SIZE: " + _preparedTaskQueue.size());
 
-                try {
-                    TimeUnit.SECONDS.sleep(2);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    //интервал повторной проверки выполнения и назначения новых задач
+                    TimeUnit.SECONDS.sleep(TASK_ALLOCATOR_CHECK_INTERVAL);
+
                 }
 
-
+            } catch (InterruptedException e) {
+                messageAndLog("TasksAllocator interrupted");
+                toLog(e.getMessage());
             }
 
         }
@@ -233,51 +277,45 @@ public class ServerTaskProducer implements ISubscriber {
         @Override
         public void run() {
 
-            for (int i = 0; i < 100; i++) {
+            try {
+                //создание списка задач (пример)
+                for (int i = 0; i < 100; i++) {
 
-                List<Integer> parameters = new ArrayList<>();
-                for (int k = i; k < i * 2; k++) {
-                    parameters.add(k);
+                    List<Integer> parameters = new ArrayList<>();
+                    for (int k = i; k < i * 2; k++) {
+                        parameters.add(k);
+                    }
+
+                    String taskName = "task" + i;
+
+                    ProducerTaskUnit taskUnit = new ProducerTaskUnit(parameters);
+
+                    int addTimeSec = i + new Random().nextInt(200);
+                    addTimeSec ^= 2;
+
+                    System.out.println(taskName + " / " + addTimeSec);
+
+                    //создание обычных задач
+//                    RemoteTaskEntity newTask = new RemoteTaskEntity(taskUnit, taskName);
+
+                    //создание отложенных задач, на определенный DateTime (независимый от часовых поясов)
+                    ScheduledTaskEntity newScheduledTask = new ScheduledTaskEntity(taskUnit, taskName);
+                    //dateTime to start scheduled task on remote client
+                    LocalDateTime targetTime = LocalDateTime.of(LocalDate.now(),
+                            LocalTime.now().plusSeconds(addTimeSec));
+                    newScheduledTask.setTargetTime(targetTime);
+
+                    //добавление в очередь
+                    _preparedTaskQueue.put(newScheduledTask);
                 }
-
-                String taskName = "task" + i;
-
-                ProducerTaskUnit taskUnit = new ProducerTaskUnit(parameters);
-                RemoteTaskEntity newTask = new RemoteTaskEntity(taskUnit, taskName);
-
-                try {
-                    _preparedTaskQueue.put(newTask);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+            } catch (InterruptedException e) {
+                messageAndLog("TaskGenerator interrupted");
+                toLog(e.getMessage());
             }
+
         }
 
     }
 
-//    private class CallableTaskUnit implements Callable<Object>, Serializable {
-//
-//        private List<Integer> _inputValues = new ArrayList<>();
-//
-//        public CallableTaskUnit(List<Integer> inputValues) {
-//            _inputValues.addAll(inputValues);
-//        }
-//
-//        @Override
-//        public Object call() throws Exception {
-//            return calculate();
-//        }
-//
-//        private Object calculate() {
-//            Integer result = 0;
-//
-//            for (Integer value : _inputValues) {
-//                result += value;
-//            }
-//
-//            return result;
-//        }
-//
-//    }
 
 }

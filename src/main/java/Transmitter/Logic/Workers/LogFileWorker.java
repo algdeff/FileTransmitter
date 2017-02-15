@@ -112,19 +112,16 @@ public class LogFileWorker implements ISubscriber {
     private void startQueueMonitor() {
 
         Thread fileWorkerThread = new Thread(() -> {
-            while (_isActive) {
-
-                List<String> result = new ArrayList<>();
-                try {
-//                    System.out.println("QUEUE1: take" + result.toString());
-                    result = _recordsQueue.take();
-                } catch (InterruptedException ie) {
-                    ie.printStackTrace();
+            try {
+                while (_isActive) {
+                    List<String> result = _recordsQueue.take();
+                    saveRecord(result);
                 }
-                saveRecord(result);
-//                System.out.println("QUEUE2: take" + result.toString());
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-        });
+
+        }, "LogQueueMonitor");
         fileWorkerThread.start();
 
     }
@@ -159,7 +156,7 @@ public class LogFileWorker implements ISubscriber {
                 CMD_LOGGER_CONSOLE_MESSAGE,
                 CMD_LOGGER_ADD_FILE_TO_STATISTICS,
                 CMD_LOGGER_CLEAR_LOG,
-                CMD_LOGGER_SHUTDOWN
+                GLOBAL_SHUTDOWN
         };
     }
 
@@ -181,7 +178,7 @@ public class LogFileWorker implements ISubscriber {
 
             }
             case CMD_LOGGER_ADD_RECORD: {
-                addRecord(publisherEvent.getBody().toString());
+                addLog(publisherEvent.getBody().toString());
                 break;
 
             }
@@ -199,7 +196,7 @@ public class LogFileWorker implements ISubscriber {
                         + publisherEvent.getInterestName() + "): \n" + publisherEvent.getBody().toString());
                 break;
             }
-            case CMD_LOGGER_SHUTDOWN: {
+            case GLOBAL_SHUTDOWN: {
                 shutdown();
                 break;
             }

@@ -8,6 +8,33 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+/**
+ * Publisher
+ *
+ * Обеспечивает глобальный обмен сообщениями и событиями между внутренними и внешними модулями приложения,
+ * находящимися удаленно, через асинхронные каналы.
+ *
+ * Любой класс приложения может зарегистрироваться (имплементируя интерфейс ISubscriber) и получать сообщения:
+ * 1) по подписке, на указанные в subscriberInterests() события;
+ * 2) по принадлежности к определенной группе, указанной при регистрации в registerNewSubscriber;
+ * 3) на свое персональное имя, указанное при регистрации в registerNewSubscriber;
+ * 4) адресованное определенному удаленному клиенту или группе удаленных клиентов;
+ * 5) от различных Broadcast событий
+ *
+ * Передача сообщений производится через:
+ * 1) sendPublisherEvent(String eventName, Object body, Object ...args) - сообщения адресованные внутренним
+ * модулям приложения, которые подписаны на событие eventName. могут содержать в себе тело Object и аргументы;
+ * 2) sendEventToGroup - отправка сообщения определенной группе;
+ * 3) sendEventToPrivateSubscriberName - отправка сообщения определенному подписчику по имени;
+ * 4) sendBroadcastEvent - отправка широковещательного сигнала всем зарегистрированным подписчикам;
+ * 5) sendTransitionEvent(IPublisherEvent publisherEvent, String targetClientID, String groupName) - отправка
+ * любого произвольного PublisherEvent'а (1-4) определенному удаленному клиенту или группе удаленных клиентов;
+ *
+ *
+ * @author  Anton Butenko
+ *
+ */
+
 public final class Publisher {
 
     /**
@@ -208,7 +235,7 @@ public final class Publisher {
         sendTransitionEvent(publisherEvent, targetClientID, null);
     }
     public void sendTransitionEvent(IPublisherEvent publisherEvent, String targetClientID, String groupName) {
-        publisherEvent.setServerCommand(SERVER_TRANSITION_EVENT);
+        publisherEvent.setServerCommand(CMD_SERVER_TRANSITION_EVENT);
         if (groupName != null) {
             for (SubscriberContext remoteClientsContext : _registeredRemoteUsers.values()) {
                 if (remoteClientsContext.getSubscriberGroupName().equals(groupName)) {
@@ -221,7 +248,7 @@ public final class Publisher {
         if (targetClientID != null) {
             for (SubscriberContext remoteClientsContext : _registeredRemoteUsers.values()) {
                 if (remoteClientsContext.getSubscriberPrivateName().equals(targetClientID)) {
-                    System.out.println("Send Transition Event to private client: " + remoteClientsContext.getSubscriberPrivateName());
+//                    System.out.println("Send Transition Event to private client: " + remoteClientsContext.getSubscriberPrivateName());
                     remoteClientsContext.getSubscriberInstance().listenerHandler(publisherEvent);
                 }
             }
@@ -229,7 +256,7 @@ public final class Publisher {
         }
         for (SubscriberContext subscriberContext : _registeredSubscribers.values()) {
             if (subscriberContext.getSubscriberGroupName().equals(TRANSITION_EVENT_GROUP_CLIENT)) {
-                System.out.println("Send Transition Event to server");
+//                System.out.println("Send Transition Event to server");
                 subscriberContext.getSubscriberInstance().listenerHandler(publisherEvent);
             }
         }

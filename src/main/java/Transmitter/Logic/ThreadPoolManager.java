@@ -157,6 +157,10 @@ public final class ThreadPoolManager implements ISubscriber {
         return  _scheduler.scheduleAtFixedRate(task, intervalSec, intervalSec, SECONDS);
     }
 
+    public ScheduledFuture<Object> scheduledCallable(Callable<Object> task, long intervalSec) {
+        return  _scheduler.schedule(task, intervalSec, SECONDS);
+    }
+
     public int getFutureTasksQueueSize() {
         return _futureTasksQueue.size();
     }
