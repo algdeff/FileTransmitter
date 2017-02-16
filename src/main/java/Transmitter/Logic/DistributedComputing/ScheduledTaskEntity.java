@@ -1,16 +1,17 @@
 package Transmitter.Logic.DistributedComputing;
 
 import java.io.Serializable;
+
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+
 import java.util.concurrent.Callable;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 
-
 public class ScheduledTaskEntity implements IRemoteTaskEntity, Delayed, Serializable {
-
-    private static final ZoneOffset TIME_ZONE_OFFSET = ZoneOffset.UTC;
 
     private Object _completedTaskResult;
     private Callable<Object> _taskUnit;
@@ -65,16 +66,19 @@ public class ScheduledTaskEntity implements IRemoteTaskEntity, Delayed, Serializ
         return _completedTaskResult;
     }
 
-
     public void setTargetTime(long epochSecond) {
         _targetTime = epochSecond;
     }
     public void setTargetTime(LocalDateTime targetTime) {
-        setTargetTime(targetTime.toEpochSecond(TIME_ZONE_OFFSET));
+        ZonedDateTime zonedTargetTime = targetTime.atZone(ZoneId.systemDefault());
+        setTargetTime(zonedTargetTime.toEpochSecond());
+    }
+    public LocalDateTime getTargetTime() {
+        return LocalDateTime.ofInstant(Instant.ofEpochSecond(_targetTime), ZoneId.systemDefault());
     }
 
     public long getTimeRemainSec() {
-        long epochSecondNow = LocalDateTime.now().toEpochSecond(TIME_ZONE_OFFSET);
+        long epochSecondNow = ZonedDateTime.now().toEpochSecond(); //System.currentTimeMillis() for epoch ms.
         return _targetTime - epochSecondNow;
     }
 

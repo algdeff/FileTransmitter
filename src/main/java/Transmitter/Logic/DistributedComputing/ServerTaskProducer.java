@@ -1,19 +1,25 @@
 package Transmitter.Logic.DistributedComputing;
 
 import static Transmitter.Facade.*;
+
 import Transmitter.Logic.ThreadPoolManager;
 import Transmitter.Publisher.Interfaces.ISubscriber;
 import Transmitter.Publisher.Interfaces.IPublisherEvent;
 import Transmitter.Publisher.Publisher;
 import Transmitter.Publisher.PublisherEvent;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.*;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * ServerTaskProducer
@@ -250,7 +256,17 @@ public class ServerTaskProducer implements ISubscriber {
                                 IRemoteTaskEntity newTask = _preparedTaskQueue.take();
                                 newTask.setAssignedClientName(client);
                                 clientTasks.add(newTask);
-                                messageAndLog("New task (" + newTask.getTaskName() + ") assigned to client: " + client);
+
+                                if (newTask.getTaskType().equals(IRemoteTaskEntity.TASK_TYPE_SCHEDULED)) {
+                                    LocalDateTime targetTime = ((ScheduledTaskEntity) newTask).getTargetTime();
+                                    long timeRemainSec = ((ScheduledTaskEntity) newTask).getTimeRemainSec();
+
+                                    messageAndLog("New task (" + newTask.getTaskName() + ") assigned to client: "
+                                            + client + " | " + targetTime + ", time remain, sec: " + timeRemainSec);
+                                } else {
+                                    messageAndLog("New task (" + newTask.getTaskName() + ") assigned to client: " + client);
+                                }
+
                             }
 
                             messageAndLog("Send " + clientTasks.size() + " tasks to client: " + client);
@@ -293,7 +309,7 @@ public class ServerTaskProducer implements ISubscriber {
                     int addTimeSec = i + new Random().nextInt(200);
                     addTimeSec ^= 2;
 
-                    System.out.println(taskName + " / " + addTimeSec);
+                    if (i == 1 || i == 3) addTimeSec = 44; //например, одинаковое время у 2х задач
 
                     //создание обычных задач
 //                    RemoteTaskEntity newTask = new RemoteTaskEntity(taskUnit, taskName);
@@ -301,9 +317,11 @@ public class ServerTaskProducer implements ISubscriber {
                     //создание отложенных задач, на определенный DateTime (независимый от часовых поясов)
                     ScheduledTaskEntity newScheduledTask = new ScheduledTaskEntity(taskUnit, taskName);
                     //dateTime to start scheduled task on remote client
-                    LocalDateTime targetTime = LocalDateTime.of(LocalDate.now(),
-                            LocalTime.now().plusSeconds(addTimeSec));
+                    LocalDateTime targetTime = LocalDateTime.now().plusSeconds(addTimeSec);
                     newScheduledTask.setTargetTime(targetTime);
+
+                    System.out.println(taskName + " (" + targetTime
+                            + "), time remaining, sec.: " + addTimeSec);
 
                     //добавление в очередь
                     _preparedTaskQueue.put(newScheduledTask);

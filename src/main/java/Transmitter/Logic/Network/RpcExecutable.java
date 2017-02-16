@@ -1,9 +1,10 @@
 package Transmitter.Logic.Network;
 
 import java.io.Serializable;
+
 import java.util.concurrent.TimeUnit;
 
-public class WebServiceExecutable implements Runnable, Serializable {
+public class RpcExecutable implements Runnable, Serializable {
 
     private String _clientID;
 
@@ -12,7 +13,7 @@ public class WebServiceExecutable implements Runnable, Serializable {
         remoteProcedure();
     }
 
-    public WebServiceExecutable(String client_ID) {
+    public RpcExecutable(String client_ID) {
         _clientID = client_ID;
     }
 

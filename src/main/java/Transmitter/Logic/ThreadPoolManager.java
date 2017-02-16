@@ -6,17 +6,17 @@ import Transmitter.Publisher.Interfaces.IPublisherEvent;
 import Transmitter.Publisher.Publisher;
 import Transmitter.Publisher.PublisherEvent;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+
 import java.util.concurrent.*;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 public final class ThreadPoolManager implements ISubscriber {
 
-    private static int _threadsNumber;
-    private static PoolWorker[] _threads;
-    private static ConcurrentLinkedQueue<Runnable> _queue;
-
-    private static ConcurrentLinkedQueue<Future> _futureTasksQueue;
+    private static final int SCHEDULER_THREADS = 10;
 
     private static ExecutorService _executorService;
     private static CompletionService _completionService;
@@ -42,81 +42,15 @@ public final class ThreadPoolManager implements ISubscriber {
 
         registerOnPublisher();
 
-        int workersThreadsNumber = 4;
-        _threadsNumber = threadsNumber;
-        _queue = new ConcurrentLinkedQueue<>();
-//        _threads = new PoolWorker[workersThreadsNumber];
-//        for (int i=0; i<workersThreadsNumber; i++) {
-//            _threads[i] = new PoolWorker();
-//            _threads[i].start();
-//        }
-
-        _futureTasksQueue = new ConcurrentLinkedQueue<>();
-
         _executorService = Executors.newWorkStealingPool(threadsNumber); //ForkJoinPool.commonPool(); //Executors.newFixedThreadPool(50);
-        _scheduler = Executors.newScheduledThreadPool(1);
+        _scheduler = Executors.newScheduledThreadPool(SCHEDULER_THREADS);
         //Executor executor = Executors.newFixedThreadPool(threadsNumber);
         _completionService = new ExecutorCompletionService<>(_executorService);
 
         _inited = true;
     }
 
-    private void sendCompleteTask() {
-
-//                Callable task = (Callable) publisherEvent.getBody();
-//                executeFutureTask(task);
-
-
-//        new Thread(() -> {
-//
-//            Callable task = (Callable) publisherEvent.getBody();
-//            executeFutureTask(task);
-//
-//            while (true) {
-//
-//            Future future = getCompletionFutureTask();
-//
-//            PublisherEvent publisherEvent = new PublisherEvent(Facade.CMD_LOGGER_CLEAR_LOG, future).addServerCommand(Facade.CMD_SERVER_ADD_FUTURE_TASK);
-//            sendEventToClient(publisherEvent);
-//
-////            try {
-////                result = future.get();
-////            } catch (InterruptedException ie) {
-////                ie.printStackTrace();
-////            } catch (ExecutionException ee) {
-////                ee.printStackTrace();
-////            }
-//
-////            Future<ArrayList> future = ThreadPoolManager.getInstance().getCompletionFutureTask();
-////            List<String> result = new ArrayList<>();
-////            try {
-////                result = future.get();
-////            } catch (InterruptedException ie) {
-////                ie.printStackTrace();
-////            } catch (ExecutionException ee) {
-////                ee.printStackTrace();
-////            }
-////
-////            addRecords(result);
-//            }
-//
-//        });
-
-    }
-
-
-//    public void addRunnableTask(Runnable task) {
-//        _executorService.execute(task);
-//    }
-//    public void shutdownRunnableTasks() {
-//        _executorService.shutdownNow();
-//    }
-
-    public void execute(Runnable task) {
-        synchronized(_queue) {
-            _queue.add(task);
-            _queue.notify();
-        }
+    public void shutdown() {
     }
 
     public void executeRunnable(Runnable runnable) {
@@ -124,33 +58,16 @@ public final class ThreadPoolManager implements ISubscriber {
     }
 
     public void executeFutureTask (Callable callable) {
-        System.err.println("ADD TASK");
         _completionService.submit(callable);
     }
-
     public Future getCompletionFutureTask() {
         Future future = null;
         try {
             future = _completionService.take();
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            toLog(e.getMessage());
         }
-        System.err.println("COMPLETE TASK");
         return future;
-    }
-
-    public void executeCallable (Callable<String> callable) {
-        Future future = _executorService.submit(callable);
-        _futureTasksQueue.add(future);
-//        ExecutorService ss = Executors.newCachedThreadPool();
-//            ThreadFactory tf = Executors.defaultThreadFactory();
-//            ThreadPoolExecutor ss =
-//            ss.execute(r);
-    }
-
-    public Future getCallableFutureFromQueue() {
-        System.err.println(getFutureTasksQueueSize());
-        return _futureTasksQueue.poll();
     }
 
     public ScheduledFuture<?> scheduledTask(Runnable task, int intervalSec) {
@@ -161,45 +78,19 @@ public final class ThreadPoolManager implements ISubscriber {
         return  _scheduler.schedule(task, intervalSec, SECONDS);
     }
 
-    public int getFutureTasksQueueSize() {
-        return _futureTasksQueue.size();
-    }
+    public ScheduledFuture<Object> taskSchedulerService(LocalDateTime targetTime, Callable<Object> callableTask) {
+        ZonedDateTime zonedTargetTime = targetTime.atZone(ZoneId.systemDefault());
 
-    public void shutdown() {
+        //time remaining, sec (for all time zones)
+        long timeRemainingSec = zonedTargetTime.toEpochSecond() - ZonedDateTime.now().toEpochSecond();
+        System.out.println(timeRemainingSec);
 
-    }
-
-
-    private class PoolWorker extends Thread {
-        //@Override
-        public void run() {
-            Runnable task;
-
-            while (true) {
-                synchronized(_queue) {
-                    while (_queue.isEmpty()) {
-                        try {
-                            _queue.wait();
-                        } catch (InterruptedException ignored) {
-                        }
-                    }
-
-                    System.out.println(_queue.size());
-                    task = (Runnable) _queue.poll();
-                }
-
-                try {
-                    task.run();
-                } catch (RuntimeException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
+        //run expired tasks instantly
+        return scheduledCallable(callableTask, timeRemainingSec > 0 ? timeRemainingSec : 0);
     }
 
     private void messageLog(String message) {
-        System.out.println(message);
-        //Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
+        Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_LOG, message);
     }
 
     private void toLog(String message) {

@@ -4,10 +4,20 @@ import static Transmitter.Facade.*;
 import Transmitter.Publisher.Publisher;
 import Transmitter.ServerStarter;
 
-import java.io.*;
-import java.net.*;
-import java.nio.channels.*;
-import java.util.concurrent.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+
+import java.net.BindException;
+import java.net.InetSocketAddress;
+
+import java.nio.channels.AsynchronousChannelGroup;
+import java.nio.channels.AsynchronousServerSocketChannel;
+import java.nio.channels.AsynchronousSocketChannel;
+import java.nio.channels.CompletionHandler;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class NetworkServer {
 
@@ -45,14 +55,10 @@ public class NetworkServer {
                         _counter++;
                         listener.accept(CLIENT_ID_PREF + _counter, this);
 
-                        //clientHandle(channel);
                         new Thread(new NetworkServerClientHandler(channel, clientID)).start();
 
-                        //System.err.println("Client terminated: " + channel.toString());
-                        //channel.close();
-
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        toLog(e.getMessage());
                     }
                 }
                 @Override
@@ -78,7 +84,6 @@ public class NetworkServer {
     private void toLog(String message) {
         Publisher.getInstance().sendPublisherEvent(CMD_LOGGER_ADD_RECORD, message);
     }
-
 
 
     private class ServerInterface implements Runnable {

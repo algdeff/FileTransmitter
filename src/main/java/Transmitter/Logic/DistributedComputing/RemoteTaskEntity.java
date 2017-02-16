@@ -1,8 +1,8 @@
 package Transmitter.Logic.DistributedComputing;
 
 import java.io.Serializable;
-import java.util.concurrent.Callable;
 
+import java.util.concurrent.Callable;
 
 public class RemoteTaskEntity implements IRemoteTaskEntity, Serializable {
 

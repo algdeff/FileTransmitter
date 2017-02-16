@@ -8,17 +8,34 @@ import Transmitter.Publisher.Publisher;
 import Transmitter.Publisher.PublisherEvent;
 import Transmitter.ServerStarter;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.Channels;
 
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.DirectoryStream;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class RemoteClient implements ISubscriber {
 
@@ -65,15 +82,11 @@ public class RemoteClient implements ISubscriber {
     }
 
     private void openConnectionToServer() {
-//        int threadsNumber = 10;
-//        ExecutorService executorService = Executors.newWorkStealingPool(threadsNumber); //ForkJoinPool.commonPool(); //Executors.newFixedThreadPool(50);
 
         try {
-//            InetSocketAddress  hostAddress = new InetSocketAddress(InetAddress.getByName(_remoteServerUrl),_remoteServerPort);
             SocketAddress hostAddress = new InetSocketAddress(InetAddress.getByName(_remoteServerUrl),_remoteServerPort);
-//            AsynchronousSocketChannel clientSocketChannel = AsynchronousSocketChannel.open(); //AsynchronousChannelGroup.withThreadPool(executorService));
-
             boolean isConnected = false;
+
             while (!isConnected) {
                 _clientSocketChannel = AsynchronousSocketChannel.open();
                 try {
@@ -89,10 +102,10 @@ public class RemoteClient implements ISubscriber {
                     }
                 }
             }
+
             message("Connected to server " + hostAddress);
 
             initOutcomeEventsToServerQueue();
-//            initTransitionEventSender();
             registerOnPublisher();
 
             InputStream inputStream = Channels.newInputStream(_clientSocketChannel);
@@ -101,11 +114,6 @@ public class RemoteClient implements ISubscriber {
             new Thread(new ServerEventMonitor()).start();
             new Thread(new ClientInterface()).start();
 
-//            clientSocketChannel.shutdownInput();
-//            clientSocketChannel.shutdownOutput();
-//            objectInputStream.close();
-//            objectOutputStream.close();
-//            clientSocketChannel.close();
         } catch (IOException e) {
             message("Server breakdown!");
             clientShutdown();
@@ -480,7 +488,7 @@ public class RemoteClient implements ISubscriber {
 
         private void callRemoteProcedure() {
             message("[RemoteProcedureCall]");
-            callRemoteProcedureOnServer(new WebServiceExecutable(getClientID()));
+            callRemoteProcedureOnServer(new RpcExecutable(getClientID()));
         }
 
         private void transitionEventDemo() {

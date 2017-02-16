@@ -1,13 +1,21 @@
 package Transmitter.Logic;
 
-import Transmitter.ServerStarter;
-import org.apache.commons.configuration2.XMLConfiguration;
-import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
-import org.apache.commons.configuration2.builder.fluent.Configurations;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+
+import java.io.File;
+import java.io.IOException;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Iterator;
+
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ConfigManager {
@@ -28,28 +36,46 @@ public final class ConfigManager {
                                                  SENT_PATH  =  "sent_path",
                                              LOG_FILE_PATH  =  "log_file_path_name",
                                           THREAD_POOL_SIZE  =  "thread_pool_size",
-                                       STATS_WRITE_INTERVAL  =  "stat_write_interval_sec",
+                                      STATS_WRITE_INTERVAL  =  "stat_write_interval_sec",
                                       OUTCOMING_TYPES_GLOB  =  "outcoming_file_type_glob";
 
     private static final ConcurrentHashMap<String, String> _properties;
 
     static {
-        Configurations configs = new Configurations();
         _properties = new ConcurrentHashMap<>();
+
         try {
-            FileBasedConfigurationBuilder<XMLConfiguration> builder = configs.xmlBuilder(CONFIG_FILE_PATH);
-            XMLConfiguration config = builder.getConfiguration();
-            Iterator<String> iterator = config.getKeys();
-            while (iterator.hasNext()) {
-                String propertyName = iterator.next();
-                System.err.println(propertyName + ": " + config.getString(propertyName));
-                _properties.put(propertyName, config.getString(propertyName));
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document document;
+
+            ClassLoader classLoader = ConfigManager.class.getClassLoader();
+            File configFile = new File(CONFIG_FILE_PATH);
+            if (configFile.exists()) {
+                document = builder.parse(configFile);
+            } else {
+                document = builder.parse(classLoader.getResourceAsStream(CONFIG_FILE_PATH));
             }
 
-        } catch (Exception cex) {
-            System.err.println("Correct config file not found: " + CONFIG_FILE_PATH);
-            ServerStarter.stopAndExit(1);
+            Element config = document.getDocumentElement();
+            config.normalize();
+            NodeList properties = config.getChildNodes();
+
+            for (int i = 0; i < properties.getLength(); i++) {
+                Node property = properties.item(i);
+                if (property.getNodeType() == Node.ELEMENT_NODE) {
+                    String propertyName = property.getNodeName();
+                    String value = property.getTextContent();
+                    System.err.println(propertyName + ": " + value);
+                    _properties.put(propertyName, value);
+                }
+
+            }
+
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            e.printStackTrace();
         }
+
     }
 
     private ConfigManager() {

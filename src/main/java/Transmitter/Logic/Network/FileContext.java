@@ -1,7 +1,9 @@
 package Transmitter.Logic.Network;
 
 import java.io.Serializable;
+
 import java.nio.file.Path;
+
 import java.text.DecimalFormat;
 
 public class FileContext implements Serializable {
